@@ -47,6 +47,8 @@ Built as a bridge between OpenAI's Real-Time Voice API and VoIP networks, with m
 
 > **⚠️ Vibe-coded project!** Developed and tested on Fritz!Box only. Other provider configs are research-based but untested. YMMV, no warranties. See [disclaimer](#️-important-disclaimer) below.
 
+![100% vibe-coded](./assets/vibe-coded.svg){width=100}
+
 ## 🔌 Claude Code Integration (Most Popular!)
 
 **Perfect for when your coding agent needs to call library authors to complain about their documentation!** 😄
