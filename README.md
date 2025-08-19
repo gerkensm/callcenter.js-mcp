@@ -2,7 +2,7 @@
 
 **An MCP Server, CLI tool, and API that makes phone calls on your behalf using VoIP.**
 
-Just tell Claude what you want to accomplish, and it will call and handle the conversation for you with real-time voice AI.
+Just tell Claude what you want to accomplish, and it will call and handle the conversation for you. This is essentially an MCP Server that bridges between OpenAI's Real-Time Voice API and your VoIP connection to call people on your behalf.
 
 ## 📞 Example: Order Pizza with Claude
 
@@ -43,7 +43,7 @@ Just tell Claude what you want to accomplish, and it will call and handle the co
 - 🖥️ **CLI Tool** - Command-line interface for direct phone calls  
 - 📚 **TypeScript API** - Programmatic library for building voice applications
 
-Built with OpenAI's Realtime API, multiple codec support (G.722, G.711), and expanded SIP protocol support for broad VoIP compatibility.
+Built as a bridge between OpenAI's Real-Time Voice API and VoIP networks, with multiple codec support (G.722, G.711), and expanded SIP protocol support for broad VoIP compatibility.
 
 > **⚠️ Vibe-coded project!** Developed and tested on Fritz!Box only. Other provider configs are research-based but untested. YMMV, no warranties. See [disclaimer](#️-important-disclaimer) below.
 
@@ -72,7 +72,7 @@ Claude Code will automatically handle the entire conversation using the AI Voice
 ## ✨ Key Features
 
 - 🎙️ **Multiple Codec Support**: G.722 wideband (16kHz) + G.711 fallback for broad compatibility
-- 🤖 **AI-Powered Conversations**: Integration with OpenAI's Realtime API with o3-mini model support
+- 🤖 **AI-Powered Conversations**: Uses OpenAI's Real-Time Voice API for actual calls, with o3-mini model for instruction generation
 - 🌐 **Expanded SIP Support**: Configurations for common SIP providers (Fritz!Box tested, others experimental)
 - 🔧 **Smart Configuration**: Auto-detects provider requirements and optimizes settings
 - 📞 **Enterprise-Ready**: Supports advanced SIP features (STUN/TURN, session timers, transport fallback)
@@ -246,7 +246,7 @@ Claude will automatically use the MCP server to make the call for you!
 
 **💡 Use `--brief` instead of `--instructions` for better results!**
 
-The `--brief` option uses OpenAI's o3-mini model to generate sophisticated instructions from your simple description, while `--instructions` sends your text directly to the real-time voice model. Since real-time models are optimized for speed (not sophistication), `--brief` typically produces much better call outcomes.
+The `--brief` option uses OpenAI's o3-mini model to generate sophisticated instructions from your simple description, while `--instructions` sends your text directly to the Real-Time Voice API. Since the Real-Time Voice API is optimized for speed (not sophistication), `--brief` typically produces much better call outcomes.
 
 ```bash
 # ✅ RECOMMENDED: Use brief for natural language goals
@@ -529,13 +529,13 @@ npm run build:no-g722
 
 ## 🤖 AI Call Brief Processing
 
-### Why This Matters: Real-Time Models Need Better Instructions
+### Why This Matters: Real-Time Voice API Needs Better Instructions
 
-OpenAI's real-time voice models are **optimized for speed, not sophistication**. They're great at natural conversation but struggle with complex, goal-oriented tasks without very specific instructions. Here's the problem:
+OpenAI's Real-Time Voice API is **optimized for speed, not sophistication**. It's great at natural conversation but struggles with complex, goal-oriented tasks without very specific instructions. Here's the problem:
 
 **❌ What doesn't work well:**
 ```bash
-# Vague brief - real-time model will be confused and unfocused
+# Vague brief - Real-Time Voice API will be confused and unfocused
 npm start call "+1234567890" --brief "Call the restaurant and book a table"
 ```
 
@@ -676,7 +676,7 @@ src/
 ├── connection-manager.ts   # Smart connection handling & reconnection
 ├── sip-client.ts          # Enhanced SIP protocol with provider support
 ├── audio-bridge.ts        # RTP streaming and codec management
-├── openai-client.ts       # OpenAI Realtime API integration
+├── openai-client.ts       # OpenAI Real-Time Voice API integration
 ├── call-brief-processor.ts # o3-mini model call brief processing
 ├── mcp-server.ts          # MCP (Model Context Protocol) server
 ├── validation.ts          # Configuration validation engine
