@@ -8,10 +8,12 @@ Just tell Claude what you want to accomplish, and it will call and handle the co
 
 **You:** "Can you call Tony's Pizza and order a large pepperoni pizza for delivery to 123 Main St? My name is John and my number is 555-0123."
 
-**Claude calls the restaurant using the AI Voice Agent:**
+**Claude automatically calls the restaurant:**
 
 ```
-⏺ ai-voice-agent - simple_call
+⏺ mcp__ai-voice-agent__simple_call(phone_number: "+15551234567", 
+                                    brief: "Call Tony's Pizza and order a large pepperoni pizza for delivery to 123 Main St. Customer name is John, phone number 555-0123", 
+                                    caller_name: "John")
   ⎿ # Simple Call Result
     
     **Status:** ✅ Success  
