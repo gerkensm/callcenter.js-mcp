@@ -244,6 +244,8 @@ Claude will automatically use the MCP server to make the call for you!
 
 ### 2. Command Line Interface
 
+**Perfect for when you need to `curl -X POST` your way out of social obligations, or finally implement that O(n log n) `ai-human-sort` algorithm - because nothing says "efficient sorting" like crowdsourcing comparisons to random strangers via VoIP!** 😄
+
 **💡 Use `--brief` instead of `--instructions` for better results!**
 
 The `--brief` option uses OpenAI's o3-mini model to generate sophisticated instructions from your simple description, while `--instructions` sends your text directly to the Real-Time Voice API. Since the Real-Time Voice API is optimized for speed (not sophistication), `--brief` typically produces much better call outcomes.
