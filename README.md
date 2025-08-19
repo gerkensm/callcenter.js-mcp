@@ -72,7 +72,7 @@ Claude Code will automatically handle the entire conversation using the AI Voice
 ## ✨ Key Features
 
 - 🎙️ **Multiple Codec Support**: G.722 wideband (16kHz) + G.711 fallback for broad compatibility
-- 🤖 **AI-Powered Conversations**: Integration with OpenAI's Realtime API with o3 model support
+- 🤖 **AI-Powered Conversations**: Integration with OpenAI's Realtime API with o3-mini model support
 - 🌐 **Expanded SIP Support**: Configurations for common SIP providers (Fritz!Box tested, others experimental)
 - 🔧 **Smart Configuration**: Auto-detects provider requirements and optimizes settings
 - 📞 **Enterprise-Ready**: Supports advanced SIP features (STUN/TURN, session timers, transport fallback)
@@ -81,7 +81,7 @@ Claude Code will automatically handle the entire conversation using the AI Voice
 - 🎯 **Provider Profiles**: Pre-configured settings for popular SIP systems
 - 🔌 **MCP Server**: Integrate with Claude Code and other MCP clients
 - 📚 **TypeScript API**: Programmatic library for building voice applications
-- 📝 **Call Brief Processing**: Natural language call instructions using o3 model
+- 📝 **Call Brief Processing**: Natural language call instructions using o3-mini model
 - 🎵 **Optional Call Recording**: Stereo WAV recording with caller/AI separation
 
 ## 🚀 Quick Start
@@ -246,7 +246,7 @@ Claude will automatically use the MCP server to make the call for you!
 
 **💡 Use `--brief` instead of `--instructions` for better results!**
 
-The `--brief` option uses OpenAI's o3 model to generate sophisticated instructions from your simple description, while `--instructions` sends your text directly to the real-time voice model. Since real-time models are optimized for speed (not sophistication), `--brief` typically produces much better call outcomes.
+The `--brief` option uses OpenAI's o3-mini model to generate sophisticated instructions from your simple description, while `--instructions` sends your text directly to the real-time voice model. Since real-time models are optimized for speed (not sophistication), `--brief` typically produces much better call outcomes.
 
 ```bash
 # ✅ RECOMMENDED: Use brief for natural language goals
@@ -553,7 +553,7 @@ npm start call "+1234567890" --brief "Call Bocca di Bacco and book a table for 2
 
 ### How It Works
 
-The system uses OpenAI's **o3 reasoning model** (the smart one) to automatically generate detailed, sophisticated instructions from your simple brief. The o3 model:
+The system uses OpenAI's **o3-mini reasoning model** (the smart one) to automatically generate detailed, sophisticated instructions from your simple brief. The o3-mini model:
 
 1. **Analyzes your brief** and understands the goal
 2. **Creates conversation states** and flow logic  
@@ -569,7 +569,7 @@ The system uses OpenAI's **o3 reasoning model** (the smart one) to automatically
 "Call Bocca di Bacco and book a table for 2 at 7pm tonight"
 ```
 
-**What o3 generates (excerpt):**
+**What o3-mini generates (excerpt):**
 ```
 ## Personality and Tone
 Identity: I am an assistant calling on behalf of John Doe to make a restaurant reservation.
@@ -595,7 +595,7 @@ Tone: Professional, warm, and respectful.
 
 ### Automatic Adaptations
 
-The o3 brief processor automatically:
+The o3-mini brief processor automatically:
 - **Detects language** from your brief and generates instructions in that language
 - **Creates conversation flow** with logical states and transitions
 - **Handles cultural context** (German restaurants vs. American vs. Japanese)
@@ -677,7 +677,7 @@ src/
 ├── sip-client.ts          # Enhanced SIP protocol with provider support
 ├── audio-bridge.ts        # RTP streaming and codec management
 ├── openai-client.ts       # OpenAI Realtime API integration
-├── call-brief-processor.ts # o3 model call brief processing
+├── call-brief-processor.ts # o3-mini model call brief processing
 ├── mcp-server.ts          # MCP (Model Context Protocol) server
 ├── validation.ts          # Configuration validation engine
 ├── config.ts             # Enhanced config loading with provider profiles
@@ -804,7 +804,7 @@ This is a personal project that includes:
 - **🎯 Provider Profiles**: Research-based guesses about different systems
 - **🔌 MCP Server**: Works with Claude Code (tested)
 - **📚 TypeScript API**: Clean interfaces for programmatic use
-- **📝 Call Brief Processing**: Uses o3 to generate instructions (works well)
+- **📝 Call Brief Processing**: Uses o3-mini to generate instructions (works well)
 - **🎵 Optional Call Recording**: Stereo WAV files with left/right channels
 - **📋 Transcript Capture**: Real-time conversation logs
 
