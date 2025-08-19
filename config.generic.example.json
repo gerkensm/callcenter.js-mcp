@@ -1,0 +1,35 @@
+{
+  "comment": "Generic SIP provider configuration with full feature set",
+  "username": "your_sip_username",
+  "password": "your_sip_password",
+  "serverIp": "sip.yourprovider.com",
+  "serverPort": 5060,
+  "localPort": 5060,
+  "provider": "generic",
+  "stunServers": [
+    "stun:stun.l.google.com:19302",
+    "stun:stun1.l.google.com:19302"
+  ],
+  "sessionTimers": {
+    "enabled": true,
+    "expires": 1800,
+    "minSE": 90,
+    "refresher": "uac"
+  },
+  "preferredTransports": ["udp", "tcp"],
+  "prackSupport": "supported",
+  "keepAlive": {
+    "method": "register",
+    "interval": 300
+  },
+  "audio": {
+    "preferredCodecs": [9, 0, 8],
+    "dtmfMethod": "rfc4733",
+    "mediaTimeout": 60
+  },
+  "openai": {
+    "apiKey": "sk-your-openai-api-key-here",
+    "voice": "alloy",
+    "instructions": "You are a helpful AI assistant speaking on a phone call. Keep your responses concise and natural."
+  }
+}

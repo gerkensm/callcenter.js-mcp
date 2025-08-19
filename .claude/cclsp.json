@@ -1,0 +1,32 @@
+{
+  "servers": [
+    {
+      "extensions": [
+        "js",
+        "ts",
+        "jsx",
+        "tsx"
+      ],
+      "command": [
+        "npx",
+        "--",
+        "typescript-language-server",
+        "--stdio"
+      ],
+      "rootDir": "."
+    },
+    {
+      "extensions": [
+        "c",
+        "cpp",
+        "cc",
+        "h",
+        "hpp"
+      ],
+      "command": [
+        "clangd"
+      ],
+      "rootDir": "."
+    }
+  ]
+}

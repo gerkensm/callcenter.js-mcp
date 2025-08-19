@@ -1,0 +1,19 @@
+{
+  "comment": "Basic Fritz Box configuration (default)",
+  "username": "your_sip_username",
+  "password": "your_sip_password", 
+  "serverIp": "192.168.1.1",
+  "serverPort": 5060,
+  "localPort": 5060,
+  "provider": "fritz-box",
+  "openai": {
+    "apiKey": "sk-your-openai-api-key-here",
+    "voice": "alloy",
+    "instructions": "You are a helpful AI assistant speaking on a phone call. Keep your responses concise and natural."
+  },
+  "audio": {
+    "preferredCodecs": [9, 0, 8],
+    "dtmfMethod": "rfc4733",
+    "mediaTimeout": 30
+  }
+}

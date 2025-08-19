@@ -1,0 +1,99 @@
+{
+  "name": "ai-voice-agent",
+  "version": "1.0.0",
+  "description": "AI-powered VoIP agent with G.722 wideband audio support for SIP-based voice communications",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./codecs": {
+      "types": "./dist/codecs/index.d.ts",
+      "import": "./dist/codecs/index.js"
+    }
+  },
+  "files": [
+    "src/**/*",
+    "tsconfig.json",
+    "dist/**/*",
+    "native/**/*",
+    "binding.gyp",
+    "scripts/**/*",
+    "LICENSE",
+    "LICENSE_G722",
+    "README.md",
+    "CHANGELOG.md",
+    "config.example.json",
+    "config.asterisk.example.json",
+    "config.cisco.example.json",
+    "config.3cx.example.json",
+    "config.generic.example.json",
+    ".env.example"
+  ],
+  "bin": {
+    "ai-voice-agent": "./dist/cli.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build:native": "node-gyp rebuild",
+    "build:ts": "tsc && cp src/codecs/g722-loader.cjs dist/codecs/",
+    "build": "npm run build:native; npm run build:ts",
+    "build:safe": "(npm run build:native || true) && (npm run build:ts || echo 'TypeScript compilation failed during install. Run npm run build:ts manually.')",
+    "build:no-g722": "ENABLE_G722=0 npm run build:native && npm run build:ts",
+    "start": "npm run build && node dist/cli.js",
+    "dev": "node --loader ts-node/esm src/cli.ts",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test:codecs": "npm run build && node test-codecs.js",
+    "validate": "npm run build && node scripts/validate-config.js",
+    "validate:detailed": "npm run validate -- --detailed --network",
+    "validate:fix": "npm run validate -- --fix-suggestions",
+    "validate:fritz-box": "npm run validate config.example.json",
+    "validate:asterisk": "npm run validate config.asterisk.example.json --detailed",
+    "validate:cisco": "npm run validate config.cisco.example.json --detailed",
+    "validate:3cx": "npm run validate config.3cx.example.json --detailed",
+    "validate:generic": "npm run validate config.generic.example.json --detailed",
+    "clean": "rm -rf dist build node_modules/.cache",
+    "postinstall": "npm run build:safe || true"
+  },
+  "gypfile": true,
+  "keywords": [
+    "voip",
+    "sip",
+    "ai",
+    "voice-agent",
+    "g722",
+    "audio",
+    "realtime",
+    "openai",
+    "telephony",
+    "wideband"
+  ],
+  "author": "Torben",
+  "license": "MIT",
+  "dependencies": {
+    "@openai/realtime-api-beta": "github:openai/openai-realtime-api-beta",
+    "@types/node": "^24.3.0",
+    "@types/ws": "^8.18.1",
+    "commander": "^14.0.0",
+    "dotenv": "^17.2.1",
+    "g711": "^1.0.1",
+    "node-addon-api": "^8.0.0",
+    "openai": "^5.12.2",
+    "rtp-parser": "^1.0.0",
+    "sipjs-udp": "^0.0.18",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2",
+    "wav": "^1.0.2",
+    "winston": "^3.17.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/wav": "^1.0.4",
+    "node-gyp": "^10.1.0"
+  }
+}

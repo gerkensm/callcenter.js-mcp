@@ -1,0 +1,35 @@
+{
+  "comment": "Asterisk PBX configuration with advanced features",
+  "username": "extension123",
+  "password": "your_extension_password",
+  "serverIp": "asterisk.yourcompany.com",
+  "serverPort": 5060,
+  "localPort": 5060,
+  "provider": "asterisk",
+  "stunServers": [
+    "stun:stun.l.google.com:19302",
+    "stun:stun1.l.google.com:19302"
+  ],
+  "sessionTimers": {
+    "enabled": true,
+    "expires": 3600,
+    "minSE": 90,
+    "refresher": "uac"
+  },
+  "preferredTransports": ["udp", "tcp"],
+  "prackSupport": "supported",
+  "keepAlive": {
+    "method": "options",
+    "interval": 60
+  },
+  "audio": {
+    "preferredCodecs": [9, 0, 8],
+    "dtmfMethod": "rfc4733",
+    "mediaTimeout": 60
+  },
+  "openai": {
+    "apiKey": "sk-your-openai-api-key-here",
+    "voice": "alloy",
+    "brief": "Call the target and assist them professionally with their request."
+  }
+}
