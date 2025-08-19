@@ -11,7 +11,7 @@ Just tell Claude what you want to accomplish, and it will call and handle the co
 **Claude automatically calls the restaurant:**
 
 ```
-⏺ mcp__ai-voice-agent__simple_call(phone_number: "+15551234567", 
+⏺ mcp__callcenter_js__simple_call(phone_number: "+15551234567", 
                                     brief: "Call Tony's Pizza and order a large pepperoni pizza for delivery to 123 Main St. Customer name is John, phone number 555-0123", 
                                     caller_name: "John")
   ⎿ # Simple Call Result
@@ -60,7 +60,7 @@ claude mcp add --env SIP_USERNAME=your_actual_extension \
   --env SIP_SERVER_IP=192.168.1.1 \
   --env OPENAI_API_KEY="sk-your_actual_openai_key" \
   --env USER_NAME="Your Actual Name" \
-  -- ai-voice-agent npx -- github:gerkensm/voip-agent --mcp
+  -- callcenter.js npx -- github:gerkensm/callcenter.js-mcp --mcp
 ```
 
 **Then just ask Claude Code to make calls:**
@@ -98,7 +98,7 @@ export SIP_SERVER_IP="192.168.1.1"
 export OPENAI_API_KEY="sk-your-key-here"
 
 # Run directly from GitHub (no installation needed!)
-npx github:gerkensm/voip-agent call "+1234567890" --brief "Call restaurant for reservation" --user-name "Your Name"
+npx github:gerkensm/callcenter.js-mcp call "+1234567890" --brief "Call restaurant for reservation" --user-name "Your Name"
 ```
 
 **Or using a .env file:**
@@ -115,7 +115,7 @@ OPENAI_VOICE=alloy
 EOF
 
 # Run from GitHub (loads .env automatically)  
-npx github:gerkensm/voip-agent call "+1234567890" --brief "Call restaurant"
+npx github:gerkensm/callcenter.js-mcp call "+1234567890" --brief "Call restaurant"
 ```
 
 **Note**: First run may show build warnings if you don't have C++ build tools, but will work fine with G.711 codec fallback (standard phone quality). For **much better audio quality**, install build tools first to enable G.722 wideband codec.
@@ -137,8 +137,8 @@ npx github:gerkensm/voip-agent call "+1234567890" --brief "Call restaurant"
 
 ```bash
 # Clone and install
-git clone <repository-url>
-cd ai-voice-agent
+git clone https://github.com/gerkensm/callcenter.js-mcp
+cd callcenter.js-mcp
 npm install
 
 # Copy example configuration
@@ -184,7 +184,7 @@ claude mcp add --env SIP_USERNAME=your_actual_extension \
   --env SIP_SERVER_IP=192.168.1.1 \
   --env OPENAI_API_KEY="sk-your_actual_openai_key" \
   --env USER_NAME="Your Actual Name" \
-  -- ai-voice-agent npx -- github:gerkensm/voip-agent --mcp
+  -- callcenter.js npx -- github:gerkensm/callcenter.js-mcp --mcp
 ```
 
 **⚠️ Important:** Replace the placeholder values with your actual SIP credentials and OpenAI API key, or the server will fail to connect.
@@ -196,9 +196,9 @@ Configure in Claude Code's MCP settings to automatically pull from GitHub:
 ```json
 {
   "mcpServers": {
-    "ai-voice-agent": {
+    "callcenter.js": {
       "command": "npx",
-      "args": ["github:gerkensm/voip-agent", "--mcp"],
+      "args": ["github:gerkensm/callcenter.js-mcp", "--mcp"],
       "env": {
         "SIP_USERNAME": "your_extension",
         "SIP_PASSWORD": "your_password",
@@ -224,7 +224,7 @@ Or configure with local installation:
 ```json
 {
   "mcpServers": {
-    "ai-voice-agent": {
+    "callcenter.js": {
       "command": "node",
       "args": ["dist/cli.js", "--mcp"],
       "cwd": "/path/to/voip-agent"
@@ -287,7 +287,7 @@ Options:
 ### 3. Programmatic API
 
 ```typescript
-import { makeCall, createAgent } from 'ai-voice-agent';
+import { makeCall, createAgent } from 'callcenter.js';
 
 // Simple call with brief
 const result = await makeCall({
@@ -707,7 +707,7 @@ The built-in validation system provides comprehensive analysis:
 ### Configuration Report Example
 
 ```
-🔍 VoIP Agent Configuration Validator
+🔍 CallCenter.js Configuration Validator
 
 📋 Provider: AVM Fritz!Box (auto-detected)
 🎯 Provider Compatibility Score: 100%

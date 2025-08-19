@@ -57,6 +57,6 @@ ACKNOWLEDGMENTS
 
 - G.722 codec implementation based on reference code from Carnegie Mellon
   University, Steve Underwood, and Sippy Software
-- Built using OpenAI's Realtime API for AI voice interactions
+- Built using OpenAI's Real-Time Voice API for AI voice interactions
 - SIP implementation using sipjs-udp library
 - Various open source Node.js packages (see package.json)
