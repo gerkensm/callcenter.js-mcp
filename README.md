@@ -4,6 +4,10 @@
 
 Just tell Claude what you want to accomplish, and it will call and handle the conversation for you. This is essentially an MCP Server that bridges between OpenAI's Real-Time Voice API and your VoIP connection to call people on your behalf.
 
+> **⚠️ Vibe-coded side project!** Please do not use this in any kind of professional context. This is a side project coded in a weekend. There are no guard rails. Your MCP client can call *any* number with this, even if you don't ask it to. In fact, it has done so during testing - it called a random person during the night and played back scary low-pitched noises. So YMMV, no warranties. See [disclaimer](#️-important-disclaimer) below.
+
+
+
 ## 📞 Example: Order Pizza with Claude
 
 **You:** "Can you call Tony's Pizza and order a large pepperoni pizza for delivery to 123 Main St? My name is John and my number is 555-0123."
