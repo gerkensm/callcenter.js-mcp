@@ -30,7 +30,7 @@ const SIMPLE_CALL_TOOL = {
         type: "string",
         description: "Brief description of what you want to accomplish on the call. Be specific about the goal, context, and any important details. Example: 'Call Bocca di Bacco restaurant and book a table for 2 people at 19:30 today for dinner. Mention dietary restrictions: vegetarian options needed.'",
         minLength: 20,
-        maxLength: 500
+        maxLength: 10000
       },
       caller_name: {
         type: "string",
@@ -428,8 +428,8 @@ class MCPServer {
       throw new Error("Brief too short. Provide at least 20 characters with specific details about what you want to accomplish.");
     }
 
-    if (brief.length > 500) {
-      throw new Error("Brief too long. Keep it under 500 characters for optimal instruction generation.");
+    if (brief.length > 10000) {
+      throw new Error("Brief too long. Keep it under 10,000 characters for optimal instruction generation.");
     }
 
     const callOptions: CallOptions = {
