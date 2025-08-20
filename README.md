@@ -22,17 +22,17 @@ Just tell Claude what you want to accomplish, and it will call and handle the co
     
     ## Call Transcript
     
-    [14:23:15] 🎤 RESTAURANT: Tony's Pizza, how can I help you?
+    [14:23:15] 🎤 HUMAN: Tony's Pizza, how can I help you?
     [14:23:15] 🤖 ASSISTANT: Hi! I'm calling on behalf of John to place a delivery order.
-    [14:23:20] 🎤 RESTAURANT: Sure! What would you like?
+    [14:23:20] 🎤 HUMAN: Sure! What would you like?
     [14:23:20] 🤖 ASSISTANT: I'd like to order one large pepperoni pizza for delivery please.
-    [14:23:25] 🎤 RESTAURANT: Large pepperoni, got it. What's the delivery address?
+    [14:23:25] 🎤 HUMAN: Large pepperoni, got it. What's the delivery address?
     [14:23:25] 🤖 ASSISTANT: The address is 123 Main Street.
-    [14:23:30] 🎤 RESTAURANT: And your phone number?
+    [14:23:30] 🎤 HUMAN: And your phone number?
     [14:23:30] 🤖 ASSISTANT: The phone number is 555-0123.
-    [14:23:35] 🎤 RESTAURANT: Perfect! That'll be $18.99. We'll have it delivered in about 30 minutes.
+    [14:23:35] 🎤 HUMAN: Perfect! That'll be $18.99. We'll have it delivered in about 30 minutes.
     [14:23:40] 🤖 ASSISTANT: That sounds great! Thank you so much.
-    [14:23:42] 🎤 RESTAURANT: You're welcome! Have a great day.
+    [14:23:42] 🎤 HUMAN: You're welcome! Have a great day.
 ```
 
 **Pizza ordered successfully!** 🍕
