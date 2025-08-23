@@ -32,7 +32,7 @@ program
   .option('--brief <text>', 'Call brief to generate instructions from (e.g., "Call Bocca di Bacco and book a table for 2 at 19:30 for Torben")')
   .option('--instructions <text>', 'Direct instructions for the AI agent (overrides config and brief)')
   .option('--user-name <name>', 'Your name for the AI to use when calling on your behalf')
-  .action(async (number: string, options) => {
+  .action(async (number: string, options: any) => {
     try {
       // Determine log level from options (default to info mode)
       let logLevel = LogLevel.INFO;
@@ -201,7 +201,7 @@ program
   .command('status')
   .description('Check agent and connection status')
   .option('-c, --config <path>', 'Configuration file path', 'config.json')
-  .action(async (options) => {
+  .action(async (options: any) => {
     try {
       const logger = initializeLogger({ level: LogLevel.INFO, enableColors: true, enableTimestamp: false });
       
@@ -236,7 +236,7 @@ program
   .command('init')
   .description('Create a sample configuration file')
   .option('-o, --output <path>', 'Output configuration file path', 'config.json')
-  .action((options) => {
+  .action((options: any) => {
     try {
       const logger = initializeLogger({ level: LogLevel.INFO, enableColors: true, enableTimestamp: false });
       
@@ -256,7 +256,7 @@ program
   .command('test-sip')
   .description('Test SIP connection only')
   .option('-c, --config <path>', 'Configuration file path', 'config.json')
-  .action(async (options) => {
+  .action(async (options: any) => {
     try {
       const config = loadConfig(options.config);
       console.log('Testing SIP connection...');
