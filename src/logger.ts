@@ -56,13 +56,45 @@ class VoIPLogger {
     if (config.transcriptOnly) {
       formats.push(
         winston.format.printf((info: any) => {
-          // In quiet mode, only show transcript level messages
+          // In quiet mode, show transcript, error, and warning level messages
           // Check both the Symbol key and string key for level
           const level = info.level || info[Symbol.for("level")];
-          if (level === "transcript" || info.level?.includes("transcript")) {
+          // Clean level of any ANSI color codes for comparison
+          const cleanLevel = String(level).replace(/\x1b\[[0-9;]*m/g, "");
+          
+          if (cleanLevel === "transcript" || cleanLevel.includes("transcript")) {
             return String(info.message);
+          } else if (cleanLevel === "error" || cleanLevel === "warn") {
+            // For errors and warnings, show with basic formatting
+            const { message, timestamp, metadata } = info;
+            const timePrefix = timestamp ? `[${timestamp}] ` : "";
+            const levelPrefix = `[${cleanLevel.toUpperCase()}] `;
+            const category = metadata?.category;
+            const categoryEmojis: { [key: string]: string } = {
+              SIP: "📞",
+              AUDIO: "🔊", 
+              AI: "🤖",
+              RTP: "📡",
+              CODEC: "🎵",
+              PERF: "📊",
+              CONFIG: "⚙️",
+              TRANSCRIPT: "💬",
+              ASSISTANT: "🤖",
+              USER: "👤",
+              CALL_STATUS: "📞",
+            };
+            const categoryPrefix = category ? `${categoryEmojis[category] || category.substring(0, 1)} ` : "";
+            // Handle multi-line indentation for quiet mode
+            const prefixLength = (timePrefix + levelPrefix + categoryPrefix).length;
+            const indentSpaces = " ".repeat(prefixLength);
+            const lines = String(message).split('\n');
+            const formattedMessage = lines.map((line, index) => 
+              index === 0 ? line : indentSpaces + line
+            ).join('\n');
+            
+            return `${timePrefix}${levelPrefix}${categoryPrefix}${formattedMessage}`;
           }
-          return ""; // Hide all non-transcript messages
+          return ""; // Hide other messages (info, debug, verbose)
         })
       );
     } else {
@@ -105,14 +137,17 @@ class VoIPLogger {
           let categoryPrefix = "";
           if (category) {
             const categoryNames: { [key: string]: string } = {
-              SIP: "SIP",
-              AUDIO: "AUD",
-              AI: "AI",
-              RTP: "RTP",
-              CODEC: "COD",
-              PERF: "PERF",
-              CONFIG: "CFG",
-              TRANSCRIPT: "TRNS",
+              SIP: "📞",
+              AUDIO: "🔊",
+              AI: "🤖",
+              RTP: "📡",
+              CODEC: "🎵",
+              PERF: "📊",
+              CONFIG: "⚙️",
+              TRANSCRIPT: "💬",
+              ASSISTANT: "🤖",
+              USER: "👤",
+              CALL_STATUS: "📞",
             };
             const categoryColors: { [key: string]: string } = {
               SIP: "\x1b[34m", // Blue
@@ -123,15 +158,15 @@ class VoIPLogger {
               PERF: "\x1b[37m", // White
               CONFIG: "\x1b[95m", // Bright Magenta
               TRANSCRIPT: "\x1b[92m", // Bright Green
+              ASSISTANT: "\x1b[36m", // Cyan
+              USER: "\x1b[92m", // Bright Green
             };
             const color = categoryColors[category] || "\x1b[0m";
-            const shortCategory = categoryNames[category] || category.substring(0, 4);
-            // Pad category to 4 characters for alignment
-            const paddedCategory = shortCategory.padEnd(4);
-            categoryPrefix = `${color}[${paddedCategory}]\x1b[0m `;
+            const emoji = categoryNames[category] || category.substring(0, 1);
+            categoryPrefix = `${emoji} `;
           } else {
-            // No category - pad with spaces to match "[CAT ] " format (7 chars)
-            categoryPrefix = " ".repeat(7);
+            // No category - pad with spaces to match "🔊 " format (2 chars)
+            categoryPrefix = "  ";
           }
 
           // Clean up message formatting - remove redundant emojis if they're in the category
@@ -144,14 +179,22 @@ class VoIPLogger {
             );
           }
 
-          return `${timePrefix}${levelPrefix}${categoryPrefix}${cleanMessage}`;
+          // Handle multi-line indentation
+          const prefixLength = (timePrefix + levelPrefix + categoryPrefix).length;
+          const indentSpaces = " ".repeat(prefixLength);
+          const lines = cleanMessage.split('\n');
+          const formattedMessage = lines.map((line, index) => 
+            index === 0 ? line : indentSpaces + line
+          ).join('\n');
+          
+          return `${timePrefix}${levelPrefix}${categoryPrefix}${formattedMessage}`;
         })
       );
     }
 
     this.logger = winston.createLogger({
       levels: winstonLevels,
-      level: config.level === LogLevel.QUIET ? "transcript" : config.level, // In quiet mode, only transcript level
+      level: config.level === LogLevel.QUIET ? "warn" : config.level, // In quiet mode, allow transcript, error, and warn levels
       format: winston.format.combine(...formats),
       transports: [
         new winston.transports.Console({
@@ -173,16 +216,13 @@ class VoIPLogger {
 
   // Standard logging methods - winston 3 expects metadata as additional arguments
   error(message: string, category?: string, meta?: any): void {
-    if (!this.config.transcriptOnly) {
-      // Pass category as part of the message object for winston 3
-      this.logger.error(message, { category, ...meta });
-    }
+    // Always show errors, even in transcript-only mode
+    this.logger.error(message, { category, ...meta });
   }
 
   warn(message: string, category?: string, meta?: any): void {
-    if (!this.config.transcriptOnly) {
-      this.logger.warn(message, { category, ...meta });
-    }
+    // Always show warnings, even in transcript-only mode
+    this.logger.warn(message, { category, ...meta });
   }
 
   info(message: string, category?: string, meta?: any): void {
@@ -256,6 +296,18 @@ class VoIPLogger {
     error: (message: string, meta?: any) => this.error(message, "CONFIG", meta),
   };
 
+  assistant = {
+    transcript: (message: string, meta?: any) => this.logger.log("transcript", message, { category: "ASSISTANT", ...meta }),
+  };
+
+  user = {
+    transcript: (message: string, meta?: any) => this.logger.log("transcript", message, { category: "USER", ...meta }),
+  };
+
+  callStatus = {
+    transcript: (message: string, meta?: any) => this.logger.log("transcript", message, { category: "CALL_STATUS", ...meta }),
+  };
+
   // Special method for conversation transcripts
   transcript(
     role: "user" | "assistant",
@@ -284,36 +336,25 @@ class VoIPLogger {
       // For delta updates, add user deltas but skip assistant deltas in quiet mode
       if (role === "user") {
         // Always add user deltas to transcript buffer (they don't have complete versions)
-        const roleIcon = "🎤";
         const timestamp = getTimestamp();
-        this.logger.log(
-          "transcript",
-          `${timestamp}${roleIcon} USER: ${text}`
-        );
+        this.user.transcript(`${timestamp}USER: ${text}`);
         this.transcriptBuffer.push(transcriptKey);
         this.lastTranscriptRole = role;
         
-      } else if (!this.config.transcriptOnly) {
-        // Skip assistant deltas in quiet mode
-        const roleIcon = "🤖";
-        const timestamp = getTimestamp();
-        this.logger.log(
-          "transcript",
-          `${timestamp}${roleIcon} ${role.toUpperCase()}: ${text}`
-        );
-        this.transcriptBuffer.push(transcriptKey);
-        this.lastTranscriptRole = role;
+      } else if (role === "assistant") {
+        // Skip assistant deltas entirely to avoid word-by-word output
+        // Assistant complete utterances will be handled in the else block below
+        return;
       }
     } else {
       // For complete utterances, always show but check for duplicates
       if (!this.transcriptBuffer.includes(transcriptKey)) {
-        const roleIcon = role === "user" ? "🎤" : "🤖";
         const timestamp = getTimestamp();
-        // Use the special transcript level that always shows
-        this.logger.log(
-          "transcript",
-          `${timestamp}${roleIcon} ${role.toUpperCase()}: ${text}`
-        );
+        if (role === "user") {
+          this.user.transcript(`${timestamp}USER: ${text}`);
+        } else {
+          this.assistant.transcript(`${timestamp}ASSISTANT: ${text}`);
+        }
         this.transcriptBuffer.push(transcriptKey);
       }
     }

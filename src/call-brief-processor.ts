@@ -26,8 +26,8 @@ export class CallBriefProcessor {
     userName?: string
   ): Promise<string> {
     try {
-      getLogger().ai.info(
-        "Generating voice agent instructions from call brief..."
+      getLogger().ai.debug(
+        "Processing call brief with o3-mini model..."
       );
       getLogger().ai.debug(`Call brief: "${briefText}"`);
 
@@ -64,12 +64,12 @@ export class CallBriefProcessor {
       }
 
       getLogger().ai.info("Successfully generated voice agent instructions");
-      getLogger().ai.info(
+      getLogger().ai.verbose(
         `Generated instructions (${instructions.length} characters):`
       );
-      getLogger().ai.info("─".repeat(60));
-      getLogger().ai.info(instructions);
-      getLogger().ai.info("─".repeat(60));
+      getLogger().ai.verbose("─".repeat(60));
+      getLogger().ai.verbose(instructions);
+      getLogger().ai.verbose("─".repeat(60));
 
       return instructions;
     } catch (error) {

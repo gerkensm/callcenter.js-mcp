@@ -97,7 +97,10 @@ export class OpenAIClient extends EventEmitter {
           logger.ai.debug(
             `Delta transcript - role: ${item.role} -> ${role}, text: "${delta.transcript}"`
           );
-          logger.transcript(role, delta.transcript, true);
+          // Only log user delta transcripts - skip assistant deltas to avoid word-by-word output
+          if (role === "user") {
+            logger.transcript(role, delta.transcript, true);
+          }
         } else if (delta.text) {
           const role = item.role === "assistant" ? "assistant" : "user";
           logger.ai.debug(

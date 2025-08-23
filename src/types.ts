@@ -126,6 +126,7 @@ export interface CallEvent {
         'CONNECTED' | 'DISCONNECTED' | 'SESSION_REFRESH' | 'TRANSPORT_FALLBACK' | 'AUTH_RETRY' | 'CONNECTION_FAILED';
   message?: any;
   data?: any;
+  endedBy?: 'remote' | 'local';
 }
 
 // Configuration loading and validation interfaces

@@ -28,6 +28,7 @@ export class AudioBridge extends EventEmitter {
   private incomingWavWriter: Writer | null = null;
   private outgoingWavWriter: Writer | null = null;
   private stereoWavWriter: Writer | null = null;
+  private currentRecordingFilename: string | null = null;
   private callRecordingEnabled: boolean = true;
   private audioMixer: AudioMixer | null = null;
   private packetCount: number = 0;
@@ -97,10 +98,10 @@ export class AudioBridge extends EventEmitter {
         this.udpSocket!.bind(0, bindHost, () => {
           const address = this.udpSocket!.address() as any;
           this.config.localRtpPort = address.port;
-          getLogger().audio.info(
+          getLogger().audio.debug(
             `Audio bridge listening on ${address.address}:${this.config.localRtpPort}`
           );
-          getLogger().audio.info(
+          getLogger().audio.debug(
             `Single socket for symmetric RTP - Fritz Box will see packets from advertised port`
           );
 
@@ -163,8 +164,9 @@ export class AudioBridge extends EventEmitter {
       this.stereoWavWriter.end();
       this.stereoWavWriter = null;
       getLogger().audio.info(
-        "Stereo call recording saved to call-recording-*.wav"
+        `Stereo call recording saved to ${this.currentRecordingFilename}`
       );
+      this.currentRecordingFilename = null;
     }
 
     this.isActive = false;
@@ -586,7 +588,7 @@ export class AudioBridge extends EventEmitter {
   setNegotiatedCodec(payloadType: number): void {
     this.negotiatedCodec = getCodec(payloadType) || null;
     if (this.negotiatedCodec) {
-      getLogger().codec.info(
+      getLogger().codec.debug(
         `Audio codec set to: ${this.negotiatedCodec.name} (PT=${payloadType}, SampleRate=${this.negotiatedCodec.sampleRate}Hz)`
       );
     } else {
@@ -832,6 +834,7 @@ export class AudioBridge extends EventEmitter {
       const callRecordingFile = fs.createWriteStream(filename);
       this.stereoWavWriter = new Writer(stereoWavOptions);
       this.stereoWavWriter.pipe(callRecordingFile);
+      this.currentRecordingFilename = filename;
 
       // Initialize audio mixer for synchronized stereo recording
       this.audioMixer = new AudioMixer(
@@ -840,7 +843,7 @@ export class AudioBridge extends EventEmitter {
       );
 
       getLogger().audio.info(
-        `📹 Stereo call recording started: ${filename} (Left: caller, Right: AI)`
+        `Stereo call recording started: ${filename} (Left: caller, Right: AI)`
       );
     } catch (error) {
       getLogger().audio.error("Failed to setup stereo call recording:", error);

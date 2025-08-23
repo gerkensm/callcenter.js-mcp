@@ -24,7 +24,8 @@ program
   .option('-c, --config <path>', 'Configuration file path', 'config.json')
   .option('-d, --duration <seconds>', 'Maximum call duration in seconds', '600')
   .option('-v, --verbose', 'Verbose mode - show all debug information')
-  .option('--log-level <level>', 'Set log level (quiet|error|warn|info|debug|verbose)', 'quiet')
+  .option('-q, --quiet', 'Quiet mode - show only transcripts, errors, and warnings')
+  .option('--log-level <level>', 'Set log level (quiet|error|warn|info|debug|verbose)', 'info')
   .option('--no-colors', 'Disable colored output')
   .option('--no-timestamp', 'Disable timestamps in logs')
   .option('--record [filename]', 'Enable stereo call recording (optional filename, defaults to call-recording-TIMESTAMP.wav)')
@@ -33,10 +34,12 @@ program
   .option('--user-name <name>', 'Your name for the AI to use when calling on your behalf')
   .action(async (number: string, options) => {
     try {
-      // Determine log level from options (default to quiet mode)
-      let logLevel = LogLevel.QUIET;
+      // Determine log level from options (default to info mode)
+      let logLevel = LogLevel.INFO;
       if (options.verbose) {
         logLevel = LogLevel.VERBOSE;
+      } else if (options.quiet) {
+        logLevel = LogLevel.QUIET;
       } else if (options.logLevel) {
         logLevel = options.logLevel as LogLevel;
       }
@@ -49,7 +52,7 @@ program
         transcriptOnly: logLevel === LogLevel.QUIET
       });
 
-      logger.info(`Starting AI voice agent call to ${number}...`);
+      logger.info(`Starting AI voice agent call to ${number}...`, "CONFIG");
       
       let config: Config;
       try {
@@ -77,7 +80,7 @@ program
         logger.info('Using instructions provided via --instructions');
       } else if (options.brief) {
         // Generate instructions from CLI brief (second priority)
-        logger.info('Generating instructions from CLI call brief...');
+        logger.info('Generating instructions from CLI call brief...', "AI");
         try {
           const processor = new CallBriefProcessor({
             openaiApiKey: config.ai?.openaiApiKey || (config as any).openai?.apiKey || process.env.OPENAI_API_KEY || '',
@@ -85,7 +88,7 @@ program
           });
           
           finalInstructions = await processor.generateInstructions(options.brief, options.userName || process.env.USER_NAME || config.ai?.userName);
-          logger.info('Successfully generated instructions from CLI call brief');
+          logger.info('Successfully generated instructions from CLI call brief', "AI");
         } catch (error) {
           if (error instanceof CallBriefError) {
             logger.error(`Call brief error: ${error.message}`);
@@ -97,10 +100,10 @@ program
       } else if (config.ai?.instructions || (config as any).openai?.instructions) {
         // Use instructions from config (third priority)
         finalInstructions = config.ai?.instructions || (config as any).openai?.instructions;
-        logger.info('Using instructions from config file');
+        logger.info('Using instructions from config file', "CONFIG");
       } else if (config.ai?.brief || (config as any).openai?.brief) {
         // Generate instructions from config brief (fourth priority)
-        logger.info('Generating instructions from config call brief...');
+        logger.info('Generating instructions from config call brief...', "AI");
         try {
           const processor = new CallBriefProcessor({
             openaiApiKey: config.ai?.openaiApiKey || (config as any).openai?.apiKey || process.env.OPENAI_API_KEY || '',
@@ -109,7 +112,7 @@ program
           
           const configBrief = config.ai?.brief || (config as any).openai?.brief || '';
           finalInstructions = await processor.generateInstructions(configBrief, options.userName || process.env.USER_NAME || config.ai?.userName);
-          logger.info('Successfully generated instructions from config call brief');
+          logger.info('Successfully generated instructions from config call brief', "AI");
         } catch (error) {
           if (error instanceof CallBriefError) {
             logger.error(`Config call brief error: ${error.message}`);
@@ -145,7 +148,6 @@ program
       });
 
       agent.on('callEnded', () => {
-        logger.sip.info('Call ended');
         // In quiet mode, show final transcript summary
         if (logLevel === LogLevel.QUIET) {
           const transcript = logger.getFullTranscript();
@@ -170,19 +172,19 @@ program
 
       if (options.duration) {
         setTimeout(async () => {
-          logger.info(`Call duration reached (${options.duration}s), ending call...`);
+          logger.info(`Call duration reached (${options.duration}s), ending call...`, "CONFIG");
           await agent.endCall();
         }, parseInt(options.duration) * 1000);
       }
 
       process.on('SIGINT', async () => {
-        logger.info('\nReceived SIGINT, shutting down gracefully...');
+        logger.info('\nReceived SIGINT, shutting down gracefully...', "CONFIG");
         await agent.shutdown();
         process.exit(0);
       });
 
       process.on('SIGTERM', async () => {
-        logger.info('\nReceived SIGTERM, shutting down gracefully...');
+        logger.info('\nReceived SIGTERM, shutting down gracefully...', "CONFIG");
         await agent.shutdown();
         process.exit(0);
       });

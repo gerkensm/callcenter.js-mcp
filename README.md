@@ -280,7 +280,8 @@ Options:
   -c, --config <path>           Configuration file path (default: config.json)
   -d, --duration <seconds>      Maximum call duration in seconds (default: 600)
   -v, --verbose                 Verbose mode - show all debug information
-  --log-level <level>           Set log level (quiet|error|warn|info|debug|verbose) (default: quiet)
+  -q, --quiet                   Quiet mode - show only transcripts, errors, and warnings
+  --log-level <level>           Set log level (quiet|error|warn|info|debug|verbose) (default: info)
   --no-colors                   Disable colored output
   --no-timestamp                Disable timestamps in logs
   --record [filename]           Enable stereo call recording (optional filename)

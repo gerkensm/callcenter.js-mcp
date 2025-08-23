@@ -79,20 +79,20 @@ m=audio ${this.localRtpPort} RTP/AVP ${payloadTypeString}`;
     sdp += '\na=sendrecv';
 
     const logger = getLogger();
-    logger.codec.info("Our SDP Codec Offer:");
-    logger.codec.info(`Offering payload types: ${payloadTypeString}`);
+    logger.codec.debug("Our SDP Codec Offer:");
+    logger.codec.debug(`Offering payload types: ${payloadTypeString}`);
     
     if (isPayloadTypeSupported(9)) {
-      logger.codec.info("   PT 9: G722/8000 (G.722 - Wideband 16kHz) [PREFERRED]");
+      logger.codec.debug("   PT 9: G722/8000 (G.722 - Wideband 16kHz) [PREFERRED]");
     }
     if (isPayloadTypeSupported(0)) {
-      logger.codec.info("   PT 0: PCMU/8000 (G.711µ - Standard 8kHz) [FALLBACK]");
+      logger.codec.debug("   PT 0: PCMU/8000 (G.711µ - Standard 8kHz) [FALLBACK]");
     }
     if (isPayloadTypeSupported(8)) {
-      logger.codec.info("   PT 8: PCMA/8000 (G.711a - Standard 8kHz) [FALLBACK]");
+      logger.codec.debug("   PT 8: PCMA/8000 (G.711a - Standard 8kHz) [FALLBACK]");
     }
-    logger.codec.info("   PT 101: telephone-event/8000 (DTMF Tones)");
-    logger.codec.info("Waiting for remote response...");
+    logger.codec.debug("   PT 101: telephone-event/8000 (DTMF Tones)");
+    logger.codec.debug("Waiting for remote response...");
     
     logger.sip.debug("Generated SDP:", sdp);
     onSuccess(sdp);
@@ -108,7 +108,7 @@ m=audio ${this.localRtpPort} RTP/AVP ${payloadTypeString}`;
   private parseRemoteSdp(sdp: string): void {
     const lines = sdp.split("\n");
     const logger = getLogger();
-    logger.codec.info("Remote SDP Codec Negotiation:");
+    logger.codec.debug("Processing remote SDP for codec negotiation");
     
     let audioPayloadTypes: string[] = [];
     const codecMap: { [key: string]: string } = {};
@@ -158,8 +158,7 @@ m=audio ${this.localRtpPort} RTP/AVP ${payloadTypeString}`;
     
     this.selectedPayloadType = selectedPayloadType;
     const selectedCodec = codecMap[selectedPayloadType.toString()] || "Unknown";
-    logger.codec.info(`Selected codec: PT ${selectedPayloadType} (${selectedCodec})`);
-    logger.codec.debug("");
+    logger.codec.info(`Codec negotiated: ${selectedCodec}`);
 
     if (this.sipClient && this.remoteRtpPort > 0) {
       this.sipClient.setRemoteRtpInfo(this.remoteIp, this.remoteRtpPort);
@@ -236,7 +235,7 @@ export class SIPClient {
       this.setupEventHandlers();
       this.startKeepalive();
 
-      getLogger().sip.info("SIP User Agent configured and starting...");
+      getLogger().sip.debug("SIP User Agent configured and starting...");
     } catch (error) {
       getLogger().sip.error("Failed to connect SIP client:", error);
       this.connectionState = 'disconnected';
@@ -402,7 +401,7 @@ export class SIPClient {
     // Enhanced event handlers with state tracking
     this.userAgent.on("connected", () => {
       this.connectionState = 'connected';
-      getLogger().sip.info("SIP User Agent connected");
+      getLogger().sip.debug("SIP User Agent connected");
       this.eventCallback({ type: "CONNECTED" });
     });
 
@@ -418,7 +417,7 @@ export class SIPClient {
 
     this.userAgent.on("registered", () => {
       this.connectionState = 'registered';
-      getLogger().sip.info("SIP User Agent registered");
+      getLogger().sip.debug("SIP User Agent registered");
       this.eventCallback({ type: "REGISTERED" });
     });
 
@@ -628,8 +627,12 @@ export class SIPClient {
       this.currentSession = this.userAgent.invite(targetUri);
 
       // Set up session event handlers
+      let progressLogged = false;
       this.currentSession.on("progress", () => {
-        getLogger().sip.info("Call in progress...");
+        if (!progressLogged) {
+          getLogger().sip.info("Call in progress...");
+          progressLogged = true;
+        }
         this.eventCallback({
           type: "CALL_INITIATED",
           data: { target: callConfig.targetNumber },
@@ -664,17 +667,17 @@ export class SIPClient {
       // Add additional event handlers for better call termination detection
       this.currentSession.on("bye", (request: any) => {
         getLogger().sip.info("BYE message received from remote party");
-        this.handleCallEnd();
+        this.handleCallEnd('remote');
       });
 
       this.currentSession.on("cancel", () => {
         getLogger().sip.info("CANCEL received - call cancelled");
-        this.handleCallEnd();
+        this.handleCallEnd('remote');
       });
 
       this.currentSession.on("rejected", (response: any) => {
         getLogger().sip.info("Call rejected:", response);
-        this.handleCallEnd();
+        this.handleCallEnd('remote');
       });
 
       return this.currentSession.id || "call-" + Date.now();
@@ -684,22 +687,23 @@ export class SIPClient {
     }
   }
 
-  private handleCallEnd(): void {
+  private handleCallEnd(endedBy: 'remote' | 'local' = 'remote'): void {
     // Prevent multiple call end handling
     if (!this.currentSession) {
       return; // Already handled
     }
     
-    getLogger().sip.info("Call ended");
+    getLogger().sip.debug("SIP session ended");
     
     this.currentSession = null;
-    this.eventCallback({ type: "CALL_ENDED" });
+    this.eventCallback({ type: "CALL_ENDED", endedBy });
   }
 
   async endCall(): Promise<void> {
     if (this.currentSession) {
       try {
         this.currentSession.terminate();
+        this.handleCallEnd('local');
       } catch (error) {
         getLogger().sip.error("Error ending call:", error);
         throw error;

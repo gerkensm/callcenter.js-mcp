@@ -236,7 +236,7 @@ export class VoiceAgent extends EventEmitter {
         this.handleCallAnswered(event);
         break;
       case "CALL_ENDED":
-        this.handleCallEnded('local');
+        this.handleCallEnded(event.endedBy || 'remote');
         break;
       case "REGISTER_FAILED":
         getLogger().sip.error("SIP registration failed:", event.message);
@@ -260,7 +260,7 @@ export class VoiceAgent extends EventEmitter {
     }
 
     if (remoteRtpIp && remoteRtpPort) {
-      getLogger().rtp.info(
+      getLogger().rtp.debug(
         `Setting up RTP connection to ${remoteRtpIp}:${remoteRtpPort}`
       );
       this.audioBridge.setRemoteEndpoint(remoteRtpIp, remoteRtpPort);
@@ -273,12 +273,10 @@ export class VoiceAgent extends EventEmitter {
       this.isCallActive = true;
       getLogger().sip.info("Call answered, connecting to OpenAI and setting up audio");
       
-      // Log call established in transcript mode
-      if (getLogger().isQuietMode()) {
-        const now = new Date();
-        const timestamp = `[${now.toTimeString().substring(0, 8)}]`;
-        getLogger().logger.log('transcript', `${timestamp} 📞 CALL ESTABLISHED`);
-      }
+      // Always log call established to transcript channel for MCP servers
+      const now = new Date();
+      const timestamp = `[${now.toTimeString().substring(0, 8)}]`;
+      getLogger().callStatus.transcript(`${timestamp} CALL ESTABLISHED`);
       
       // Start performance monitoring when call begins
       this.perfMonitor.startMonitoring();
@@ -338,15 +336,13 @@ export class VoiceAgent extends EventEmitter {
   private async handleCallEnded(endedBy: 'remote' | 'local' = 'local'): Promise<void> {
     this.isCallActive = false;
     this.currentCallId = null;
-    getLogger().sip.info("Call ended, cleaning up...");
+    const endedByText = endedBy === 'remote' ? 'remote party' : 'local';
+    getLogger().sip.info(`Call ended by ${endedByText}, cleaning up...`);
     
-    // Log call ended in transcript mode
-    if (getLogger().isQuietMode()) {
-      const now = new Date();
-      const timestamp = `[${now.toTimeString().substring(0, 8)}]`;
-      const endedByText = endedBy === 'remote' ? ' (ended by remote party)' : ' (ended by us)';
-      getLogger().logger.log('transcript', `${timestamp} 📞 CALL ENDED${endedByText}`);
-    }
+    // Always log call ended to transcript channel for MCP servers
+    const now = new Date();
+    const timestamp = `[${now.toTimeString().substring(0, 8)}]`;
+    getLogger().callStatus.transcript(`${timestamp} CALL ENDED by ${endedByText}`);
     
     // Clear any pending audio batch
     this.clearAudioBatch();
@@ -365,7 +361,7 @@ export class VoiceAgent extends EventEmitter {
   }
 
   async initialize(): Promise<void> {
-    getLogger().info("Initializing voice agent...");
+    getLogger().info("Initializing voice agent...", "CONFIG");
 
     try {
       if (this.connectionManager) {
@@ -377,7 +373,7 @@ export class VoiceAgent extends EventEmitter {
         getLogger().sip.info("Using direct SIP connection (legacy mode)...");
         await this.sipClient.connect();
       }
-      getLogger().info("Voice agent initialized successfully");
+      getLogger().info("Voice agent initialized successfully", "CONFIG");
     } catch (error) {
       getLogger().error("Failed to initialize voice agent:", error instanceof Error ? error.message : String(error));
       throw error;
@@ -460,7 +456,7 @@ export class VoiceAgent extends EventEmitter {
   }
 
   async shutdown(): Promise<void> {
-    getLogger().info("Shutting down voice agent...");
+    getLogger().info("Shutting down voice agent...", "CONFIG");
 
     if (this.isCallActive) {
       await this.endCall();

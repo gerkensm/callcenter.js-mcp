@@ -44,7 +44,7 @@ export class PerformanceMonitor extends EventEmitter {
       });
       this.gcObserver.observe({ entryTypes: ['gc'] });
     } catch (e) {
-      getLogger().perf.warn('GC monitoring not available:', e instanceof Error ? e.message : String(e));
+      getLogger().perf.debug('GC monitoring not available:', e instanceof Error ? e.message : String(e));
     }
     
     // Monitor event loop lag every 100ms
