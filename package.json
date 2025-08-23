@@ -76,7 +76,6 @@
   "author": "Torben",
   "license": "MIT",
   "dependencies": {
-    "@openai/realtime-api-beta": "github:openai/openai-realtime-api-beta",
     "@types/node": "^24.3.0",
     "@types/ws": "^8.18.1",
     "commander": "^14.0.0",

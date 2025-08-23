@@ -196,6 +196,7 @@ export class SIPClient {
   private presetRtpPort: number = 0;
   private keepAliveTimer: NodeJS.Timeout | null = null;
   private connectionState: 'disconnected' | 'connecting' | 'connected' | 'registered' = 'disconnected';
+  private isLocalHangup: boolean = false;
 
   constructor(config: SIPAdvancedConfig, eventCallback: (event: CallEvent) => void) {
     this.config = config;
@@ -518,7 +519,7 @@ export class SIPClient {
   private handleFritzBoxError(error: any): boolean {
     // Fritz Box typically works with basic settings
     if (error.message?.includes('STUN')) {
-      getLogger().sip.info('Fritz Box doesn\'t need STUN, disabling for retry...');
+      getLogger().sip.debug('Fritz Box doesn\'t need STUN, disabling for retry...');
       this.config.stunServers = [];
       return true;
     }
@@ -656,7 +657,9 @@ export class SIPClient {
 
       this.currentSession.on("terminated", (message: any) => {
         getLogger().sip.info("SIP session terminated");
-        this.handleCallEnd();
+        const endedBy = this.isLocalHangup ? 'local' : 'remote';
+        this.isLocalHangup = false; // Reset flag
+        this.handleCallEnd(endedBy);
       });
 
       this.currentSession.on("failed", (response: any) => {
@@ -666,8 +669,11 @@ export class SIPClient {
 
       // Add additional event handlers for better call termination detection
       this.currentSession.on("bye", (request: any) => {
-        getLogger().sip.info("BYE message received from remote party");
-        this.handleCallEnd('remote');
+        // Only log if it's actually from remote (not triggered by our own terminate())
+        if (!this.isLocalHangup) {
+          getLogger().sip.info("BYE message received from remote party");
+        }
+        // Don't call handleCallEnd here - let 'terminated' handle it
       });
 
       this.currentSession.on("cancel", () => {
@@ -702,10 +708,12 @@ export class SIPClient {
   async endCall(): Promise<void> {
     if (this.currentSession) {
       try {
+        this.isLocalHangup = true; // Mark that we initiated the hangup
         this.currentSession.terminate();
-        this.handleCallEnd('local');
+        // Don't call handleCallEnd here - let the 'terminated' event handle it
       } catch (error) {
         getLogger().sip.error("Error ending call:", error);
+        this.isLocalHangup = false;
         throw error;
       }
     }

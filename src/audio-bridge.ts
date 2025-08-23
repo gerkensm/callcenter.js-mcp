@@ -34,6 +34,12 @@ export class AudioBridge extends EventEmitter {
   private packetCount: number = 0;
   private sendCount: number = 0;
   private rtpPacketQueue: Buffer[] = [];
+  private responseAudioTracking: Map<string, {
+    packetsQueued: number;
+    packetsSent: number;
+    callback?: () => void;
+  }> = new Map();
+  private currentResponseId?: string;
   private rtpSendInterval: NodeJS.Timeout | null = null;
   private audioProcessor: AudioProcessor;
   private needsInitialBurst: boolean = true;
@@ -186,7 +192,7 @@ export class AudioBridge extends EventEmitter {
     }
     this.rtpTimeoutTimer = setTimeout(() => {
       if (this.hasReceivedAudio && this.isActive) {
-        getLogger().rtp.info(
+        getLogger().rtp.debug(
           `No RTP packets received for ${this.RTP_TIMEOUT_MS}ms. Emitting timeout.`
         );
         this.emit("rtpTimeout");
@@ -286,7 +292,7 @@ export class AudioBridge extends EventEmitter {
     };
   }
 
-  sendAudio(audioData: Int16Array): void {
+  sendAudio(audioData: Int16Array, responseId?: string): void {
     if (
       !this.isActive ||
       !this.udpSocket ||
@@ -298,6 +304,18 @@ export class AudioBridge extends EventEmitter {
         "Cannot send audio: bridge not ready or configured."
       );
       return;
+    }
+
+    // Track which response this audio belongs to
+    if (responseId && responseId !== this.currentResponseId) {
+      getLogger().audio.debug(`New response audio starting: ${responseId}`);
+      this.currentResponseId = responseId;
+      if (!this.responseAudioTracking.has(responseId)) {
+        this.responseAudioTracking.set(responseId, {
+          packetsQueued: 0,
+          packetsSent: 0,
+        });
+      }
     }
 
     try {
@@ -409,6 +427,14 @@ export class AudioBridge extends EventEmitter {
     }
 
     this.rtpPacketQueue.push(...packetsToSend);
+    
+    // Track how many packets we've queued for the current response
+    if (this.currentResponseId) {
+      const tracking = this.responseAudioTracking.get(this.currentResponseId);
+      if (tracking) {
+        tracking.packetsQueued += packetsToSend.length;
+      }
+    }
 
     if (!this.rtpSendInterval) {
       this.startRtpSender();
@@ -470,6 +496,10 @@ export class AudioBridge extends EventEmitter {
 
       if (this.rtpPacketQueue.length > 0) {
         const packet = this.rtpPacketQueue.shift()!;
+        
+        // Track packet sending for response completion detection
+        this.trackPacketSent();
+        
         this.sendSocket!.send(
           packet,
           this.config.remoteRtpPort,
@@ -542,8 +572,69 @@ export class AudioBridge extends EventEmitter {
     this.rtpSendInterval = setTimeout(sendPacket, 0);
   }
 
+  private trackPacketSent(): void {
+    // Go through all tracked responses and increment sent count
+    for (const [responseId, tracking] of this.responseAudioTracking) {
+      if (tracking.packetsSent < tracking.packetsQueued) {
+        tracking.packetsSent++;
+        
+        // Check if this response is complete
+        if (tracking.packetsSent === tracking.packetsQueued && tracking.callback) {
+          getLogger().audio.debug(`Response audio playback complete for ${responseId}`, "AUDIO");
+          
+          // Execute callback after a small delay to ensure audio has been heard
+          setTimeout(() => {
+            tracking.callback!();
+            // Clean up tracking for completed responses
+            this.responseAudioTracking.delete(responseId);
+          }, 100); // 100ms safety margin for network/playback latency
+          
+          break; // Only one response can own this packet
+        }
+      }
+    }
+  }
+
+  public cancelPendingCallbacks(): void {
+    getLogger().audio.debug("Canceling all pending response callbacks", "AUDIO");
+    // Clear all callbacks without executing them
+    for (const [responseId, tracking] of this.responseAudioTracking) {
+      if (tracking.callback) {
+        getLogger().audio.debug(`Canceled callback for response ${responseId}`, "AUDIO");
+        tracking.callback = undefined;
+      }
+    }
+  }
+
+  public notifyWhenResponseComplete(responseId: string, callback: () => void): void {
+    getLogger().audio.debug(`Setting up completion callback for response ${responseId}`, "AUDIO");
+    const tracking = this.responseAudioTracking.get(responseId);
+    if (tracking) {
+      tracking.callback = callback;
+      getLogger().audio.debug(`Response tracking: ${tracking.packetsSent}/${tracking.packetsQueued} packets sent`, "AUDIO");
+      
+      // Check if already complete
+      if (tracking.packetsSent === tracking.packetsQueued && tracking.packetsQueued > 0) {
+        getLogger().audio.debug(`Response already complete, executing callback`, "AUDIO");
+        setTimeout(callback, 100);
+        this.responseAudioTracking.delete(responseId);
+      }
+    } else {
+      // Create tracking entry if it doesn't exist yet
+      getLogger().audio.debug(`Response not yet tracked, creating entry with callback`, "AUDIO");
+      this.responseAudioTracking.set(responseId, {
+        packetsQueued: 0,
+        packetsSent: 0,
+        callback,
+      });
+    }
+  }
+
   private sendPacketImmediately(packet: Buffer): void {
     if (!this.sendSocket) return;
+    
+    // Track packet sending for immediate sends too
+    this.trackPacketSent();
 
     this.sendSocket.send(
       packet,
@@ -601,7 +692,7 @@ export class AudioBridge extends EventEmitter {
   setRemoteEndpoint(host: string, port: number): void {
     this.config.remoteRtpHost = host;
     this.config.remoteRtpPort = port;
-    getLogger().rtp.info(`Remote RTP endpoint set to ${host}:${port}`);
+    getLogger().rtp.debug(`Remote RTP endpoint set to ${host}:${port}`);
 
     // Don't connect the UDP socket - keep it unconnected for bidirectional RTP
     // Connected sockets can interfere with receiving RTP from Fritz Box
@@ -725,7 +816,7 @@ export class AudioBridge extends EventEmitter {
           );
         }
       } else {
-        getLogger().rtp.info(
+        getLogger().rtp.debug(
           `Fritz Box RTP: Successfully receiving audio, bidirectional flow established!`
         );
         clearInterval(statusInterval);

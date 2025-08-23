@@ -18,6 +18,7 @@ export class VoiceAgent extends EventEmitter {
   private currentCallId: string | null = null;
   private perfMonitor: PerformanceMonitor;
   private enableCallRecording: boolean = true;
+  private aiEndCallReason: string | null = null;
   
   // Audio batching to reduce OpenAI SDK overhead
   private audioBatch: Int16Array[] = [];
@@ -81,11 +82,11 @@ export class VoiceAgent extends EventEmitter {
     });
 
     this.connectionManager.on('connected', () => {
-      getLogger().sip.info('ConnectionManager: Connected to SIP server');
+      getLogger().sip.debug('ConnectionManager: Connected to SIP server');
     });
 
     this.connectionManager.on('registered', () => {
-      getLogger().sip.info('ConnectionManager: Registered with SIP server');
+      getLogger().sip.debug('ConnectionManager: Registered with SIP server');
     });
 
     this.connectionManager.on('connectionFailed', (error) => {
@@ -145,15 +146,45 @@ export class VoiceAgent extends EventEmitter {
       this.emit("error", error);
     });
 
-    this.openaiClient.onAudioReceived((audioData: Int16Array) => {
+    this.openaiClient.onAudioReceived((audioData: Int16Array, responseId?: string) => {
       if (this.isCallActive && this.audioBridge.isRunning()) {
-        this.audioBridge.sendAudio(audioData);
+        this.audioBridge.sendAudio(audioData, responseId);
       }
+    });
+
+    // Handle AI-initiated end call
+    this.openaiClient.onEndCall(() => {
+      if (this.isCallActive) {
+        getLogger().ai.info("AI ended the call", 'AI');
+        this.endCall();
+      }
+    });
+    
+    // Track AI's reason for ending call
+    this.openaiClient.on('aiEndCallDecision', (reason: string) => {
+      this.aiEndCallReason = reason;
+    });
+
+    // Handle response with end_call completing generation - wait for audio to finish
+    this.openaiClient.on('responseWithEndCallComplete', (responseId: string) => {
+      getLogger().ai.debug(`Response ${responseId} with end_call generated, waiting for audio playback`, 'AI');
+      
+      // Tell AudioBridge to notify us when this response finishes playing
+      this.audioBridge.notifyWhenResponseComplete(responseId, () => {
+        getLogger().ai.debug(`Response ${responseId} audio playback complete, executing end_call`, 'AI');
+        this.openaiClient.executePendingEndCall();
+      });
+    });
+
+    // Handle cancellation of pending end_call
+    this.openaiClient.on('cancelPendingEndCall', () => {
+      getLogger().ai.debug('Canceling pending end_call due to user interruption', 'AI');
+      this.audioBridge.cancelPendingCallbacks();
     });
 
     // Handle conversation interruptions
     this.openaiClient.on('conversationInterrupted', () => {
-      getLogger().ai.info('User interrupted - stopping audio playback');
+      getLogger().ai.debug('User interrupted - stopping audio playback');
       this.clearAudioBatch(); // Clear any pending audio batch
       if (this.audioBridge.isRunning()) {
         this.audioBridge.clearAudioBuffer();
@@ -230,7 +261,7 @@ export class VoiceAgent extends EventEmitter {
 
     switch (event.type) {
       case "REGISTERED":
-        getLogger().sip.info("SIP client registered successfully");
+        getLogger().sip.debug("SIP client registered successfully");
         break;
       case "CALL_ANSWERED":
         this.handleCallAnswered(event);
@@ -242,7 +273,7 @@ export class VoiceAgent extends EventEmitter {
         getLogger().sip.error("SIP registration failed:", event.message);
         break;
       case "DISCONNECTED":
-        getLogger().sip.info("SIP client disconnected");
+        getLogger().sip.debug("SIP client disconnected");
         break;
     }
   }
@@ -271,12 +302,11 @@ export class VoiceAgent extends EventEmitter {
     // Only do initial setup if this is the first CALL_ANSWERED event
     if (!this.isCallActive) {
       this.isCallActive = true;
-      getLogger().sip.info("Call answered, connecting to OpenAI and setting up audio");
+      getLogger().sip.debug("Call answered, connecting to OpenAI and setting up audio");
       
       // Always log call established to transcript channel for MCP servers
-      const now = new Date();
-      const timestamp = `[${now.toTimeString().substring(0, 8)}]`;
-      getLogger().callStatus.transcript(`${timestamp} CALL ESTABLISHED`);
+      const timestamp = getLogger().isQuietMode() ? `[${new Date().toTimeString().substring(0, 8)}] ` : '';
+      getLogger().callStatus.transcript(`${timestamp}📞 CALL ESTABLISHED`);
       
       // Start performance monitoring when call begins
       this.perfMonitor.startMonitoring();
@@ -336,13 +366,27 @@ export class VoiceAgent extends EventEmitter {
   private async handleCallEnded(endedBy: 'remote' | 'local' = 'local'): Promise<void> {
     this.isCallActive = false;
     this.currentCallId = null;
-    const endedByText = endedBy === 'remote' ? 'remote party' : 'local';
-    getLogger().sip.info(`Call ended by ${endedByText}, cleaning up...`);
+    
+    // Determine who really ended the call and why
+    let endedByText: string;
+    if (this.aiEndCallReason) {
+      // AI ended the call - show the reason
+      endedByText = `AI (${this.aiEndCallReason})`;
+      getLogger().sip.debug(`Call ended by AI: ${this.aiEndCallReason}`);
+    } else if (endedBy === 'remote') {
+      endedByText = 'remote party';
+      getLogger().sip.debug(`Call ended by remote party`);
+    } else {
+      endedByText = 'local user';
+      getLogger().sip.debug(`Call ended by local user`);
+    }
     
     // Always log call ended to transcript channel for MCP servers
-    const now = new Date();
-    const timestamp = `[${now.toTimeString().substring(0, 8)}]`;
-    getLogger().callStatus.transcript(`${timestamp} CALL ENDED by ${endedByText}`);
+    const timestamp = getLogger().isQuietMode() ? `[${new Date().toTimeString().substring(0, 8)}] ` : '';
+    getLogger().callStatus.transcript(`${timestamp}📞 CALL ENDED by ${endedByText}`);
+    
+    // Reset the AI end call reason for next call
+    this.aiEndCallReason = null;
     
     // Clear any pending audio batch
     this.clearAudioBatch();
@@ -366,11 +410,11 @@ export class VoiceAgent extends EventEmitter {
     try {
       if (this.connectionManager) {
         // Use ConnectionManager for enhanced connection handling
-        getLogger().sip.info("Using ConnectionManager for SIP connection...");
+        getLogger().sip.debug("Using ConnectionManager for SIP connection...");
         await this.connectionManager.connect(this.sipClient);
       } else {
         // Fallback to direct connection for legacy config
-        getLogger().sip.info("Using direct SIP connection (legacy mode)...");
+        getLogger().sip.debug("Using direct SIP connection (legacy mode)...");
         await this.sipClient.connect();
       }
       getLogger().info("Voice agent initialized successfully", "CONFIG");
@@ -389,13 +433,13 @@ export class VoiceAgent extends EventEmitter {
       throw new Error("Call already in progress");
     }
 
-    getLogger().sip.info(`Making call to ${callConfig.targetNumber}`);
+    getLogger().sip.debug(`Making call to ${callConfig.targetNumber}`);
 
     try {
       // Start AudioBridge first to get the actual RTP port
       if (!this.audioBridge.isRunning()) {
         await this.audioBridge.start();
-        getLogger().audio.info(
+        getLogger().audio.debug(
           `AudioBridge started on port: ${this.audioBridge.getLocalPort()}`
         );
 
@@ -420,7 +464,7 @@ export class VoiceAgent extends EventEmitter {
       return;
     }
 
-    getLogger().sip.info("Ending call...");
+    getLogger().sip.debug("Ending call...");
 
     try {
       await this.sipClient.endCall();
