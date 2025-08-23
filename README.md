@@ -4,6 +4,14 @@
 
 Just tell Claude what you want to accomplish, and it will call and handle the conversation for you. This is essentially an MCP Server that bridges between OpenAI's Real-Time Voice API and your VoIP connection to call people on your behalf.
 
+## 📚 Quick Context for the Uninitiated
+
+**VoIP (Voice over IP)** is how you make phone calls over the internet instead of traditional phone lines. **SIP (Session Initiation Protocol)** is the language these systems speak to connect calls. Think of it as HTTP but for phone calls.
+
+**Fritz!Box** is a popular German router/modem that happens to have a built-in phone system (PBX). If you have one, you already have everything you need to make VoIP calls - this tool just connects to it. Outside Germany, you might know similar devices from other brands, or use dedicated VoIP services like Asterisk, 3CX, or cloud providers.
+
+**MCP (Model Context Protocol)** is Anthropic's standard for connecting AI assistants like Claude to external tools and services. It's what lets Claude Code actually *do* things instead of just talking about them.
+
 > **⚠️ Vibe-coded side project!** Please do not use this in any kind of professional context. This is a side project coded in a weekend. There are no guard rails. Your MCP client can call *any* number with this, even if you don't ask it to. In fact, it has done so during testing - it called a random number during the night "for testing" and played back scary low-pitched noises - then claimed it called MY number. So YMMV, no warranties. See [disclaimer](#️-important-disclaimer) below.
 
 
@@ -49,7 +57,7 @@ Just tell Claude what you want to accomplish, and it will call and handle the co
 
 Built as a bridge between OpenAI's Real-Time Voice API and VoIP networks, with multiple codec support (G.722, G.711), and expanded SIP protocol support for broad VoIP compatibility.
 
-> **⚠️ Vibe-coded project!** Developed and tested on Fritz!Box only. Other provider configs are research-based but untested. YMMV, no warranties. See [disclaimer](#️-important-disclaimer) below.
+> **⚠️ Vibe-coded project!** Developed and tested on Fritz!Box (a German router with built-in VoIP) only. Other provider configs are research-based but untested. YMMV, no warranties. See [disclaimer](#️-important-disclaimer) below.
 
 ![100% vibe-coded](./assets/vibe-coded.svg)
 
@@ -78,7 +86,7 @@ Claude Code will automatically handle the entire conversation using the AI Voice
 ## ✨ Key Features
 
 - 🎙️ **Multiple Codec Support**: G.722 wideband (16kHz) + G.711 fallback for broad compatibility
-- 🤖 **AI-Powered Conversations**: Uses OpenAI's Real-Time Voice API for actual calls, with o3-mini model for instruction generation
+- 🤖 **AI-Powered Conversations**: Uses OpenAI's Real-Time Voice API for actual calls, with o3-mini model (OpenAI's reasoning model) for instruction generation
 - 🌐 **Expanded SIP Support**: Configurations for common SIP providers (Fritz!Box tested, others experimental)
 - 🔧 **Smart Configuration**: Auto-detects provider requirements and optimizes settings
 - 📞 **Enterprise-Ready**: Supports advanced SIP features (STUN/TURN, session timers, transport fallback)
@@ -474,7 +482,7 @@ The validator will check:
 
 ### ✅ **Actually Tested** 
 
-- **AVM Fritz!Box** - Home/SMB routers with built-in SIP ✅ **WORKS** (only one actually tested)
+- **AVM Fritz!Box** - German router brand with built-in VoIP/SIP phone system ✅ **WORKS** (only one actually tested)
 
 ### 🤷 **Vibe-coded Configs** (Educated Guesses)
 
@@ -562,7 +570,7 @@ npm start call "+1234567890" --brief "Call Bocca di Bacco and book a table for 2
 
 ### How It Works
 
-The system uses OpenAI's **o3-mini reasoning model** (the smart one) to automatically generate detailed, sophisticated instructions from your simple brief. The o3-mini model:
+The system uses OpenAI's **o3-mini reasoning model** (their latest small reasoning model - smart but fast) to automatically generate detailed, sophisticated instructions from your simple brief. The o3-mini model:
 
 1. **Analyzes your brief** and understands the goal
 2. **Creates conversation states** and flow logic  
