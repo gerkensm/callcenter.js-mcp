@@ -311,7 +311,15 @@ class VoIPLogger {
   };
 
   callStatus = {
-    transcript: (message: string, meta?: any) => this.logger.log("transcript", message, { category: "CALL_STATUS", ...meta }),
+    transcript: (message: string, meta?: any) => {
+      // Log the message
+      this.logger.log("transcript", message, { category: "CALL_STATUS", ...meta });
+      
+      // Always add to transcript buffer for getFullTranscript()
+      // Extract the actual message content (remove timestamp if present)
+      const cleanMessage = message.replace(/^\[[^\]]+\]\s*/, '');
+      this.transcriptBuffer.push(`call_status:${cleanMessage}`);
+    },
   };
 
   // Special method for conversation transcripts
@@ -374,10 +382,27 @@ class VoIPLogger {
       if (colonIndex > 0) {
         const role = entry.substring(0, colonIndex);
         const text = entry.substring(colonIndex + 1);
-        const roleIcon = role === "user" ? "🎤" : "🤖";
+        
+        // Handle different roles
+        let roleIcon: string;
+        let displayRole: string;
+        if (role === "user") {
+          roleIcon = "🎤";
+          displayRole = "USER";
+        } else if (role === "assistant") {
+          roleIcon = "🤖";
+          displayRole = "ASSISTANT";
+        } else if (role === "call_status") {
+          // Return call status messages without role prefix, they already have their own format
+          return text;
+        } else {
+          roleIcon = "";
+          displayRole = role.toUpperCase();
+        }
+        
         const timestamp = this.config.transcriptOnly ? 
           `[${new Date().toTimeString().substring(0, 8)}] ` : '';
-        return `${timestamp}${roleIcon} ${role.toUpperCase()}: ${text}`;
+        return `${timestamp}${roleIcon} ${displayRole}: ${text}`;
       }
       return entry; // Fallback for any malformed entries
     });
