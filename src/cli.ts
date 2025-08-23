@@ -58,13 +58,13 @@ program
       try {
         config = loadConfig(options.config);
       } catch (error) {
-        logger.warn('Failed to load config file, trying environment variables...');
+        logger.warn('Failed to load config file, trying environment variables...', 'CONFIG');
         const envConfig = loadConfigFromEnv();
         
         if (!envConfig.sip?.username || !envConfig.ai?.openaiApiKey) {
-          logger.error('No valid configuration found.');
-          logger.error('Either provide a config file with --config or set environment variables:');
-          logger.error('  SIP_USERNAME, SIP_PASSWORD, SIP_SERVER_IP, OPENAI_API_KEY');
+          logger.error('No valid configuration found.', 'CONFIG');
+          logger.error('Either provide a config file with --config or set environment variables:', 'CONFIG');
+          logger.error('  SIP_USERNAME, SIP_PASSWORD, SIP_SERVER_IP, OPENAI_API_KEY', 'CONFIG');
           process.exit(1);
         }
         
@@ -91,9 +91,9 @@ program
           logger.info('Successfully generated instructions from CLI call brief', "AI");
         } catch (error) {
           if (error instanceof CallBriefError) {
-            logger.error(`Call brief error: ${error.message}`);
+            logger.error(`Call brief error: ${error.message}`, "AI");
           } else {
-            logger.error(`Failed to generate instructions: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            logger.error(`Failed to generate instructions: ${error instanceof Error ? error.message : 'Unknown error'}`, "AI");
           }
           process.exit(1);
         }
@@ -115,9 +115,9 @@ program
           logger.info('Successfully generated instructions from config call brief', "AI");
         } catch (error) {
           if (error instanceof CallBriefError) {
-            logger.error(`Config call brief error: ${error.message}`);
+            logger.error(`Config call brief error: ${error.message}`, "AI");
           } else {
-            logger.error(`Failed to generate instructions from config: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            logger.error(`Failed to generate instructions from config: ${error instanceof Error ? error.message : 'Unknown error'}`, "AI");
           }
           process.exit(1);
         }

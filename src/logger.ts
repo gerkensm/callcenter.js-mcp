@@ -68,7 +68,13 @@ class VoIPLogger {
             // For errors and warnings, show with basic formatting
             const { message, timestamp, metadata } = info;
             const timePrefix = timestamp ? `[${timestamp}] ` : "";
-            const levelPrefix = `[${cleanLevel.toUpperCase()}] `;
+            const levelNames: { [key: string]: string } = {
+              error: "ERR",
+              warn: "WARN",
+            };
+            const shortLevel = levelNames[cleanLevel] || cleanLevel.toUpperCase();
+            const paddedLevel = shortLevel.padEnd(4);
+            const levelPrefix = `[${paddedLevel}] `;
             const category = metadata?.category;
             const categoryEmojis: { [key: string]: string } = {
               SIP: "📞",
