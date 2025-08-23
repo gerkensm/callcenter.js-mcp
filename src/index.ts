@@ -103,7 +103,7 @@ export async function makeCall(options: CallOptions): Promise<CallResult> {
       transcriptOnly: logLevel === LogLevel.QUIET
     });
 
-    logger.info(`Starting AI voice agent call to ${options.number}...`);
+    logger.info(`Starting AI voice agent call to ${options.number}...`, 'CONFIG');
     
     // Load configuration
     let config: Config;
@@ -111,7 +111,7 @@ export async function makeCall(options: CallOptions): Promise<CallResult> {
       try {
         config = loadConfig(options.config);
       } catch (error) {
-        logger.warn('Failed to load config file, trying environment variables...');
+        logger.warn('Failed to load config file, trying environment variables...', 'CONFIG');
         const envConfig = loadConfigFromEnv();
         
         if (!envConfig.sip?.username || !envConfig.ai?.openaiApiKey) {
@@ -136,9 +136,9 @@ export async function makeCall(options: CallOptions): Promise<CallResult> {
     
     if (options.instructions) {
       finalInstructions = options.instructions;
-      logger.info('Using instructions provided via options');
+      logger.info('Using instructions provided via options', 'CONFIG');
     } else if (options.brief) {
-      logger.info('Generating instructions from call brief...');
+      logger.info('Generating instructions from call brief...', 'AI');
       try {
         const processor = new CallBriefProcessor({
           openaiApiKey: config.ai?.openaiApiKey || (config as any).openai?.apiKey || process.env.OPENAI_API_KEY || '',
@@ -146,7 +146,7 @@ export async function makeCall(options: CallOptions): Promise<CallResult> {
         });
         
         finalInstructions = await processor.generateInstructions(options.brief, options.userName);
-        logger.info('Successfully generated instructions from call brief');
+        logger.info('Successfully generated instructions from call brief', 'AI');
       } catch (error) {
         if (error instanceof CallBriefError) {
           throw new Error(`Call brief error: ${error.message}`);
@@ -156,9 +156,9 @@ export async function makeCall(options: CallOptions): Promise<CallResult> {
       }
     } else if (config.ai?.instructions || (config as any).openai?.instructions) {
       finalInstructions = config.ai?.instructions || (config as any).openai?.instructions;
-      logger.info('Using instructions from config');
+      logger.info('Using instructions from config', 'CONFIG');
     } else if (config.ai?.brief || (config as any).openai?.brief) {
-      logger.info('Generating instructions from config call brief...');
+      logger.info('Generating instructions from config call brief...', 'AI');
       try {
         const processor = new CallBriefProcessor({
           openaiApiKey: config.ai?.openaiApiKey || (config as any).openai?.apiKey || process.env.OPENAI_API_KEY || '',
@@ -167,7 +167,7 @@ export async function makeCall(options: CallOptions): Promise<CallResult> {
         
         const configBrief = config.ai?.brief || (config as any).openai?.brief || '';
         finalInstructions = await processor.generateInstructions(configBrief, options.userName);
-        logger.info('Successfully generated instructions from config call brief');
+        logger.info('Successfully generated instructions from config call brief', 'AI');
       } catch (error) {
         if (error instanceof CallBriefError) {
           throw new Error(`Config call brief error: ${error.message}`);
@@ -201,20 +201,20 @@ export async function makeCall(options: CallOptions): Promise<CallResult> {
         try {
           await agent.shutdown();
         } catch (error) {
-          logger.error('Error during cleanup:', error instanceof Error ? error.message : String(error));
+          logger.error('Error during cleanup:', error instanceof Error ? error.message : String(error), 'CONFIG');
         }
       };
 
       agent.on('callInitiated', ({ callId: id, target }) => {
         callId = id;
-        logger.info(`Call initiated to ${target}`);
+        logger.info(`Call initiated to ${target}`, 'SIP');
       });
 
       agent.on('callEnded', async () => {
         if (callEnded) return;
         callEnded = true;
         
-        logger.info('Call ended');
+        logger.info('Call ended', 'SIP');
         const duration = Math.round((Date.now() - startTime) / 1000);
         
         // Get transcript if in quiet mode
@@ -234,7 +234,7 @@ export async function makeCall(options: CallOptions): Promise<CallResult> {
         if (callEnded) return;
         callEnded = true;
         
-        logger.error(`Agent error: ${error.message}`);
+        logger.error(`Agent error: ${error.message}`, 'CONFIG');
         await cleanup();
         reject(new Error(`Call failed: ${error.message}`));
       });
@@ -253,7 +253,7 @@ export async function makeCall(options: CallOptions): Promise<CallResult> {
           if (options.duration) {
             setTimeout(async () => {
               if (!callEnded) {
-                logger.info(`Call duration reached (${options.duration}s), ending call...`);
+                logger.info(`Call duration reached (${options.duration}s), ending call...`, 'CONFIG');
                 await agent.endCall();
               }
             }, options.duration * 1000);

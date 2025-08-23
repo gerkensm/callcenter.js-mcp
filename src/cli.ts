@@ -77,7 +77,7 @@ program
       if (options.instructions) {
         // Direct instructions provided via CLI (highest priority)
         finalInstructions = options.instructions;
-        logger.info('Using instructions provided via --instructions');
+        logger.info('Using instructions provided via --instructions', 'CONFIG');
       } else if (options.brief) {
         // Generate instructions from CLI brief (second priority)
         logger.info('Generating instructions from CLI call brief...', "AI");
