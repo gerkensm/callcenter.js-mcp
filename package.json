@@ -1,6 +1,6 @@
 {
   "name": "ai-voice-agent",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "AI-powered VoIP agent with G.722 wideband audio support for SIP-based voice communications",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
