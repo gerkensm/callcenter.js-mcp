@@ -316,9 +316,8 @@ class VoIPLogger {
       this.logger.log("transcript", message, { category: "CALL_STATUS", ...meta });
       
       // Always add to transcript buffer for getFullTranscript()
-      // Extract the actual message content (remove timestamp if present)
-      const cleanMessage = message.replace(/^\[[^\]]+\]\s*/, '');
-      this.transcriptBuffer.push(`call_status:${cleanMessage}`);
+      // Keep the message as-is including timestamp since it's already formatted
+      this.transcriptBuffer.push(`call_status:${message}`);
     },
   };
 
