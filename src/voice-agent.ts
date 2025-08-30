@@ -22,9 +22,9 @@ export class VoiceAgent extends EventEmitter {
   
   // Audio batching to reduce OpenAI SDK overhead
   private audioBatch: Int16Array[] = [];
-  private readonly BATCH_SIZE = 10; // Batch 10 packets (100ms) before sending to OpenAI
+  private readonly BATCH_SIZE = 2; // Batch only 2 packets (20ms) to reduce latency
   private batchTimer: NodeJS.Timeout | null = null;
-  private readonly BATCH_TIMEOUT_MS = 100; // Force send after 100ms even if batch isn't full
+  private readonly BATCH_TIMEOUT_MS = 20; // Force send after 20ms for lower latency
 
   constructor(config: Config, options?: { enableCallRecording?: boolean; recordingFilename?: string }) {
     super();

@@ -497,7 +497,7 @@ export class OpenAIClient extends EventEmitter {
     }
     let binary = '';
     const bytes = new Uint8Array(arrayBuffer);
-    const chunkSize = 0x8000; // 32KB chunk size
+    const chunkSize = 0x1000; // 4KB chunk size for lower latency
     for (let i = 0; i < bytes.length; i += chunkSize) {
       const chunk = bytes.subarray(i, i + chunkSize);
       binary += String.fromCharCode.apply(null, Array.from(chunk));
