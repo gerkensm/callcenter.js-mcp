@@ -605,6 +605,61 @@ export class AudioBridge extends EventEmitter {
       }
     }
   }
+  
+  /**
+   * Get the response ID that is currently playing (has packets queued but not all sent).
+   * @returns The response ID of the currently playing response, or null if none
+   */
+  public getCurrentlyPlayingResponseId(): string | null {
+    // Find the first response in insertion order that has unsent packets
+    for (const [responseId, tracking] of this.responseAudioTracking) {
+      if (tracking.packetsSent < tracking.packetsQueued) {
+        return responseId;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Get the current playback position of the currently playing response.
+   * @returns The playback position in milliseconds, or 0 if no response is playing
+   */
+  public getCurrentPlaybackPosition(): number {
+    const playingId = this.getCurrentlyPlayingResponseId();
+    return playingId ? this.getResponsePlaybackPosition(playingId) : 0;
+  }
+
+  /**
+   * Get the current playback position for a response in milliseconds.
+   * Returns the estimated time of audio that has been sent to the SIP endpoint.
+   * 
+   * @param responseId - The response ID to check, or undefined for the currently playing response
+   * @returns The playback position in milliseconds, or 0 if response not found
+   */
+  public getResponsePlaybackPosition(responseId?: string): number {
+    // If no responseId provided, use the currently playing response
+    const targetId = responseId || this.getCurrentlyPlayingResponseId();
+    
+    if (!targetId) {
+      return 0;
+    }
+    
+    const tracking = this.responseAudioTracking.get(targetId);
+    if (!tracking) {
+      return 0;
+    }
+    
+    // Each packet represents 10ms of audio (samplesPerPacket = sampleRate / 100)
+    // So packetsSent * 10 = milliseconds of audio played
+    const playbackMs = tracking.packetsSent * 10;
+    
+    getLogger().audio.debug(
+      `Response ${targetId} playback position: ${playbackMs}ms (${tracking.packetsSent}/${tracking.packetsQueued} packets sent)`,
+      "AUDIO"
+    );
+    
+    return playbackMs;
+  }
 
   public notifyWhenResponseComplete(responseId: string, callback: () => void): void {
     getLogger().audio.debug(`Setting up completion callback for response ${responseId}`, "AUDIO");

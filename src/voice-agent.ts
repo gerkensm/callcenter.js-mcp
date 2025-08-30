@@ -172,7 +172,20 @@ export class VoiceAgent extends EventEmitter {
       // Tell AudioBridge to notify us when this response finishes playing
       this.audioBridge.notifyWhenResponseComplete(responseId, () => {
         getLogger().ai.debug(`Response ${responseId} audio playback complete, executing end_call`, 'AI');
+        // First log the queued transcript, then execute end_call
+        this.openaiClient.logQueuedTranscript(responseId);
         this.openaiClient.executePendingEndCall();
+      });
+    });
+    
+    // Handle regular response completion - set up transcript logging
+    this.openaiClient.on('responseGenerated', (responseId: string) => {
+      getLogger().ai.debug(`Response ${responseId} generated, setting up transcript logging`, 'AI');
+      
+      // Tell AudioBridge to notify us when this response finishes playing
+      this.audioBridge.notifyWhenResponseComplete(responseId, () => {
+        getLogger().ai.debug(`Response ${responseId} audio playback complete, logging queued transcript`, 'AI');
+        this.openaiClient.logQueuedTranscript(responseId);
       });
     });
 
@@ -188,6 +201,28 @@ export class VoiceAgent extends EventEmitter {
       this.clearAudioBatch(); // Clear any pending audio batch
       if (this.audioBridge.isRunning()) {
         this.audioBridge.clearAudioBuffer();
+      }
+    });
+    
+    // Handle playback position requests for accurate truncation
+    this.openaiClient.on('getPlaybackPosition', (callback: (position: number) => void) => {
+      if (this.audioBridge.isRunning()) {
+        // Get the current playback position of the currently playing response
+        const position = this.audioBridge.getCurrentPlaybackPosition();
+        callback(position);
+      } else {
+        callback(0);
+      }
+    });
+    
+    // Handle requests for the currently playing response ID
+    this.openaiClient.on('getPlayingResponseId', (callback: (responseId: string | null) => void) => {
+      if (this.audioBridge.isRunning()) {
+        // Get the currently playing response ID from AudioBridge
+        const playingResponseId = this.audioBridge.getCurrentlyPlayingResponseId();
+        callback(playingResponseId);
+      } else {
+        callback(null);
       }
     });
   }
