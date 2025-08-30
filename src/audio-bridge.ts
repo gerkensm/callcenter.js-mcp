@@ -38,10 +38,15 @@ export class AudioBridge extends EventEmitter {
     packetsQueued: number;
     packetsSent: number;
     callback?: () => void;
-    safetyTimeout?: NodeJS.Timeout;
+    // Progress-based monitoring to avoid arbitrary timeouts
+    monitorInterval?: NodeJS.Timeout;
+    lastProgressAt?: number;
+    lastSentCount?: number;
   }> = new Map();
   private currentResponseId?: string;
   private rtpSendInterval: NodeJS.Timeout | null = null;
+  // Track responses that were explicitly interrupted (user barge-in)
+  private interruptedResponses: Set<string> = new Set();
   private audioProcessor: AudioProcessor;
   private needsInitialBurst: boolean = true;
   private lastSendTime: number = 0;
@@ -576,20 +581,26 @@ export class AudioBridge extends EventEmitter {
       if (tracking.packetsSent < tracking.packetsQueued) {
         tracking.packetsSent++;
         
+        // Update progress timestamp for stall detection
+        tracking.lastProgressAt = Date.now();
+        tracking.lastSentCount = tracking.packetsSent;
+        
         // Check if this response is complete
         if (tracking.packetsSent === tracking.packetsQueued && tracking.callback) {
-          getLogger().audio.debug(`Response audio playback complete for ${responseId}`, "AUDIO");
+          getLogger().audio.debug(`Response audio playback complete for ${responseId} (${tracking.packetsSent}/${tracking.packetsQueued})`, "AUDIO");
+          
+          // Stop monitor if running
+          if (tracking.monitorInterval) {
+            clearInterval(tracking.monitorInterval);
+            tracking.monitorInterval = undefined;
+          }
           
           // Execute callback after a small delay to ensure audio has been heard
           setTimeout(() => {
             const finalCallback = tracking.callback!;
-            // Clear safety timeout if it exists
-            if (tracking.safetyTimeout) {
-              clearTimeout(tracking.safetyTimeout);
-            }
             // Clean up tracking for completed responses
             this.responseAudioTracking.delete(responseId);
-            finalCallback(); // This will clear the safety timeout through wrappedCallback (backup)
+            finalCallback();
           }, 100); // 100ms safety margin for network/playback latency
           
           break; // Only one response can own this packet
@@ -600,17 +611,20 @@ export class AudioBridge extends EventEmitter {
 
   public cancelPendingCallbacks(): void {
     getLogger().audio.debug("Canceling all pending response callbacks", "AUDIO");
-    // Clear all callbacks and safety timeouts without executing them
-    for (const [responseId, tracking] of this.responseAudioTracking) {
+    // Clear all callbacks and monitors without executing them
+    for (const [responseId, tracking] of [...this.responseAudioTracking]) {
       if (tracking.callback) {
         getLogger().audio.debug(`Canceled callback for response ${responseId}`, "AUDIO");
         tracking.callback = undefined;
       }
-      if (tracking.safetyTimeout) {
-        getLogger().audio.debug(`Cleared safety timeout for response ${responseId}`, "AUDIO");
-        clearTimeout(tracking.safetyTimeout);
-        tracking.safetyTimeout = undefined;
+      if (tracking.monitorInterval) {
+        getLogger().audio.debug(`Cleared monitor interval for response ${responseId}`, "AUDIO");
+        clearInterval(tracking.monitorInterval);
+        tracking.monitorInterval = undefined;
       }
+      // Mark as interrupted and remove tracking so we don't later warn on "stall"
+      this.interruptedResponses.add(responseId);
+      this.responseAudioTracking.delete(responseId);
     }
   }
   
@@ -672,79 +686,135 @@ export class AudioBridge extends EventEmitter {
   public notifyWhenResponseComplete(responseId: string, callback: () => void): void {
     getLogger().audio.debug(`Setting up completion callback for response ${responseId}`, "AUDIO");
     const tracking = this.responseAudioTracking.get(responseId);
-    
-    // Set up a safety timeout to prevent hanging calls
-    const timeoutMs = 5000; // 5 second minimal safety net
-    const safetyTimeout = setTimeout(() => {
-      // Determine if this is an expected case (no/short audio) or anomalous (audio queued but never completed)
-      const tr = this.responseAudioTracking.get(responseId);
-      const queued = tr?.packetsQueued ?? 0;
-      const sent = tr?.packetsSent ?? 0;
-      const msg = `Safety timeout triggered for response ${responseId} - executing callback anyway (queued=${queued}, sent=${sent})`;
-      if (queued === 0) {
-        // Normal: text-only / tool-only / zero-audio response
-        getLogger().audio.debug(msg, "AUDIO");
-      } else {
-        // Potentially anomalous: audio was expected but didn't complete
-        getLogger().audio.warn(msg, "AUDIO");
-      }
-      this.responseAudioTracking.delete(responseId);
+    // If this response was interrupted earlier, finish immediately without monitors or warnings
+    if (this.interruptedResponses.has(responseId)) {
+      getLogger().audio.debug(
+        `Response ${responseId} was previously interrupted - executing completion callback immediately`,
+        "AUDIO"
+      );
+      this.interruptedResponses.delete(responseId);
       callback();
-    }, timeoutMs);
-    
-    // Wrap the callback to clear the timeout
-    const wrappedCallback = () => {
-      clearTimeout(safetyTimeout);
-      callback();
-    };
-    
+      return;
+    }
+    const NEAR_COMPLETE_REMAINING = 2; // Treat <=2 packets remaining as completed to avoid false stalls
+    const STALL_MS = 4000;   // treat as stall if no packets sent progress for 4s
+    const TICK_MS = 250;     // monitor interval
+
     if (tracking) {
-      // Clear any existing timeout
-      if (tracking.safetyTimeout) {
-        clearTimeout(tracking.safetyTimeout);
-      }
-      tracking.callback = wrappedCallback;
-      tracking.safetyTimeout = safetyTimeout;
+      tracking.callback = callback;
+      // Initialize progress markers
+      tracking.lastProgressAt = Date.now();
+      tracking.lastSentCount = tracking.packetsSent;
       getLogger().audio.debug(`Response tracking: ${tracking.packetsSent}/${tracking.packetsQueued} packets sent`, "AUDIO");
       
-      // Check if already complete
+      // If already complete, execute immediately
       if (tracking.packetsSent === tracking.packetsQueued && tracking.packetsQueued > 0) {
         getLogger().audio.debug(`Response already complete, executing callback`, "AUDIO");
-        clearTimeout(safetyTimeout);
+        if (tracking.monitorInterval) {
+          clearInterval(tracking.monitorInterval);
+          tracking.monitorInterval = undefined;
+        }
         setTimeout(callback, 100);
         this.responseAudioTracking.delete(responseId);
-      } else if (tracking.packetsQueued === 0) {
-        // Special case: if no packets are queued after a short delay, assume no audio and execute callback
-        setTimeout(() => {
-          const updatedTracking = this.responseAudioTracking.get(responseId);
-          if (updatedTracking && updatedTracking.packetsQueued === 0) {
-            getLogger().audio.debug(`No audio packets for response ${responseId}, executing callback`, "AUDIO");
-            clearTimeout(safetyTimeout);
-            this.responseAudioTracking.delete(responseId);
-            callback();
-          }
-        }, 500); // Wait 500ms for audio to arrive
+        return;
       }
+      
+      // Start progress-based monitor to avoid arbitrary timeout
+      if (tracking.monitorInterval) {
+        clearInterval(tracking.monitorInterval);
+      }
+      tracking.monitorInterval = setInterval(() => {
+        const tr = this.responseAudioTracking.get(responseId);
+        if (!tr || !tr.callback) {
+          // Tracking removed or callback already executed
+          if (tr?.monitorInterval) {
+            clearInterval(tr.monitorInterval);
+            tr.monitorInterval = undefined;
+          }
+          return;
+        }
+        // Normal completion
+        if (tr.packetsQueued > 0 && tr.packetsSent === tr.packetsQueued) {
+          getLogger().audio.debug(`Monitor: playback completed for ${responseId} (${tr.packetsSent}/${tr.packetsQueued})`, "AUDIO");
+          clearInterval(tr.monitorInterval!);
+          tr.monitorInterval = undefined;
+          const cb = tr.callback!;
+          this.responseAudioTracking.delete(responseId);
+          setTimeout(cb, 100);
+          return;
+        }
+        // Progress detection
+        if (tr.packetsSent !== tr.lastSentCount) {
+          tr.lastSentCount = tr.packetsSent;
+          tr.lastProgressAt = Date.now();
+          return;
+        }
+        // Stall detection (no progress for STALL_MS while still having packets to send)
+        if (tr.packetsQueued > tr.packetsSent && tr.lastProgressAt && (Date.now() - tr.lastProgressAt) > STALL_MS) {
+          const remaining = tr.packetsQueued - tr.packetsSent;
+          // If we're effectively at the tail (<= 2 packets left), treat as complete without warning
+          if (remaining <= NEAR_COMPLETE_REMAINING) {
+            getLogger().audio.info(`Playback near-complete for ${responseId} - finishing (queued=${tr.packetsQueued}, sent=${tr.packetsSent}, remaining=${remaining})`, "AUDIO");
+          } else {
+            getLogger().audio.warn(`Playback stall detected for ${responseId} - executing callback (queued=${tr.packetsQueued}, sent=${tr.packetsSent})`, "AUDIO");
+          }
+          clearInterval(tr.monitorInterval!);
+          tr.monitorInterval = undefined;
+          const cb = tr.callback!;
+          this.responseAudioTracking.delete(responseId);
+          cb();
+        }
+      }, TICK_MS);
     } else {
       // Create tracking entry if it doesn't exist yet
       getLogger().audio.debug(`Response not yet tracked, creating entry with callback`, "AUDIO");
-      this.responseAudioTracking.set(responseId, {
+      const entry = {
         packetsQueued: 0,
         packetsSent: 0,
-        callback: wrappedCallback,
-        safetyTimeout: safetyTimeout,
-      });
-      
-      // Special case: if no packets arrive within a short time, execute callback anyway
-      setTimeout(() => {
-        const updatedTracking = this.responseAudioTracking.get(responseId);
-        if (updatedTracking && updatedTracking.packetsQueued === 0 && updatedTracking.callback) {
-          getLogger().audio.debug(`No audio packets received for response ${responseId}, executing callback`, "AUDIO");
-          clearTimeout(safetyTimeout);
-          this.responseAudioTracking.delete(responseId);
-          callback();
+        callback: callback,
+        monitorInterval: undefined,
+        lastProgressAt: Date.now(),
+        lastSentCount: 0,
+      } as any;
+      this.responseAudioTracking.set(responseId, entry);
+      // Start monitor immediately; it will end when packets drain or stall is detected
+      entry.monitorInterval = setInterval(() => {
+        const tr = this.responseAudioTracking.get(responseId);
+        if (!tr || !tr.callback) {
+          if (tr?.monitorInterval) {
+            clearInterval(tr.monitorInterval);
+            tr.monitorInterval = undefined;
+          }
+          return;
         }
-      }, 500); // Wait 500ms for audio to arrive
+        if (tr.packetsQueued > 0 && tr.packetsSent === tr.packetsQueued) {
+          getLogger().audio.debug(`Monitor: playback completed for ${responseId} (${tr.packetsSent}/${tr.packetsQueued})`, "AUDIO");
+          clearInterval(tr.monitorInterval!);
+          tr.monitorInterval = undefined;
+          const cb = tr.callback!;
+          this.responseAudioTracking.delete(responseId);
+          setTimeout(cb, 100);
+          return;
+        }
+        if (tr.packetsSent !== tr.lastSentCount) {
+          tr.lastSentCount = tr.packetsSent;
+          tr.lastProgressAt = Date.now();
+          return;
+        }
+        if (tr.packetsQueued > tr.packetsSent && tr.lastProgressAt && (Date.now() - tr.lastProgressAt) > 4000) {
+          const remaining = tr.packetsQueued - tr.packetsSent;
+          if (remaining <= NEAR_COMPLETE_REMAINING) {
+            getLogger().audio.info(`Playback near-complete for ${responseId} - finishing (queued=${tr.packetsQueued}, sent=${tr.packetsSent}, remaining=${remaining})`, "AUDIO");
+          } else {
+            getLogger().audio.warn(`Playback stall detected for ${responseId} - executing callback (queued=${tr.packetsQueued}, sent=${tr.packetsSent})`, "AUDIO");
+          }
+          clearInterval(tr.monitorInterval!);
+          tr.monitorInterval = undefined;
+          const cb = tr.callback!;
+          this.responseAudioTracking.delete(responseId);
+          cb();
+        }
+      }, 250);
     }
   }
 
@@ -960,6 +1030,22 @@ export class AudioBridge extends EventEmitter {
 
     // Reset buffer size to reasonable default for new conversation
     this.dynamicBufferSize = Math.max(30, this.dynamicBufferSize - 10);
+
+    // Mark any in-flight responses as interrupted and remove their tracking to avoid later stall warnings
+    if (this.responseAudioTracking.size > 0) {
+      for (const [responseId, tracking] of [...this.responseAudioTracking]) {
+        if (tracking.monitorInterval) {
+          clearInterval(tracking.monitorInterval);
+          tracking.monitorInterval = undefined;
+        }
+        this.interruptedResponses.add(responseId);
+        this.responseAudioTracking.delete(responseId);
+        getLogger().audio.debug(
+          `Marked response ${responseId} as interrupted (queued=${tracking.packetsQueued}, sent=${tracking.packetsSent}); cleared tracking`,
+          "AUDIO"
+        );
+      }
+    }
 
     // IMPORTANT: Do NOT clear stereo recorder buffers here.
     // We want WAV to reflect the real call timeline including interruptions.
