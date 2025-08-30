@@ -25,6 +25,8 @@ export class OpenAIClient extends EventEmitter {
   private canceledResponses: Set<string> = new Set();
   // Track current response ID for correlation
   private currentResponseId: string | null = null;
+  // Track which responses actually produced audio
+  private responseHasAudio: Set<string> = new Set();
   // Track accumulated user transcription from delta events
   private currentUserTranscript: string = '';
   // Queue completed transcripts until audio finishes playing
@@ -88,6 +90,10 @@ export class OpenAIClient extends EventEmitter {
           case 'response.audio.delta':
             // Handle audio streaming from OpenAI
             if (event.delta) {
+              // Mark that this response produced audio
+              if (event.response_id) {
+                this.responseHasAudio.add(event.response_id);
+              }
               // Track audio delta in our tracker for correlation
               if (event.response_id) {
                 const tracker = this.responseTrackers.get(event.response_id);
@@ -410,6 +416,33 @@ export class OpenAIClient extends EventEmitter {
             break;
 
           case 'response.done':
+            // Note: response.done uses event.response.id not event.response_id
+            {
+              const rid = event.response?.id || event.response_id;
+              // If this response contains an end_call and there was NO audio generated,
+              // we should end immediately (no need to wait for playback).
+              if (this.pendingEndCall && this.pendingEndCall.responseId === rid) {
+                const hadAudio = this.responseHasAudio.has(rid);
+                if (!hadAudio) {
+                  // Try to log any transcript we already have, otherwise mark for later flush
+                  const tracker = this.responseTrackers.get(rid);
+                  const fullText =
+                    (tracker && tracker.getFullTranscript()) ||
+                    this.pendingTranscripts.get(rid);
+                  if (fullText && fullText.trim().length > 0) {
+                    getLogger().transcript("assistant", fullText, false);
+                    this.pendingTranscripts.delete(rid);
+                  } else {
+                    // No transcript yet; mark playback as completed so when text arrives,
+                    // logQueuedTranscript() will flush it immediately.
+                    this.playbackCompleted.add(rid);
+                  }
+                  // Execute end_call right now (no audio expected)
+                  this.executePendingEndCall();
+                }
+                // If there WAS audio, fall through to normal handling below
+              }
+            }
             // Note: response.done uses event.response.id not event.response_id
             const responseId = event.response?.id || event.response_id;
             logger.ai.debug(`Response completed: ${responseId}`, "AI");
@@ -993,6 +1026,7 @@ export class OpenAIClient extends EventEmitter {
     this.responseTrackers.delete(responseId);
     this.canceledResponses.delete(responseId);
     this.playbackCompleted.delete(responseId);
+    this.responseHasAudio.delete(responseId);
     this.pendingTranscripts.delete(responseId);
     
     // Clean up item mapping (scan and remove entries pointing to this response)
