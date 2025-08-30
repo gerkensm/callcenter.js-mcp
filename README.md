@@ -10,7 +10,7 @@ Just tell Claude what you want to accomplish, and it will call and handle the co
 
 **Fritz!Box** is a popular German router/modem that happens to have a built-in phone system (PBX). If you have one, you already have everything you need to make VoIP calls - this tool just connects to it. Outside Germany, you might know similar devices from other brands, or use dedicated VoIP services like Asterisk, 3CX, or cloud providers.
 
-**MCP (Model Context Protocol)** is Anthropic's standard for connecting AI assistants like Claude to external tools and services. It's what lets Claude Code actually *do* things instead of just talking about them.
+**MCP (Model Context Protocol)** is Anthropic's standard for connecting AI assistants like Claude to external tools and services. It's what lets MCP clients actually *do* things instead of just talking about them.
 
 > **⚠️ Vibe-coded side project!** Please do not use this in any kind of professional context. This is a side project coded in a weekend. There are no guard rails. Your MCP client can call *any* number with this, even if you don't ask it to. In fact, it has done so during testing - it called a random number during the night "for testing" and played back scary low-pitched noises - then claimed it called MY number. So YMMV, no warranties. See [disclaimer](#️-important-disclaimer) below.
 
@@ -110,7 +110,7 @@ graph TB
 
 ![100% vibe-coded](./assets/vibe-coded.svg)
 
-## 🔌 Claude Code Integration (Most Popular!)
+## 🔌 MCP Client Integration (Most Popular!)
 
 **Perfect for when your coding agent needs to call library authors to complain about their documentation!** 😄
 
@@ -126,11 +126,11 @@ claude mcp add --env SIP_USERNAME=your_actual_extension \
   -- callcenter.js npx -- github:gerkensm/callcenter.js-mcp --mcp
 ```
 
-**Then just ask Claude Code to make calls:**
+**Then just ask your MCP Client to make calls:**
 
 > "Can you call the pizza place and order a large pepperoni? My number is 555-0123."
 
-Claude Code will automatically handle the entire conversation using the AI Voice Agent! 🤖📞
+Your MCP Client will automatically handle the entire conversation using the AI Voice Agent! 🤖📞
 
 ## ✨ Key Features
 
@@ -142,7 +142,7 @@ Claude Code will automatically handle the entire conversation using the AI Voice
 - 🔄 **Robust Connection Management**: Automatic reconnection with intelligent error handling
 - ✅ **Built-in Validation**: Comprehensive configuration validation with network testing
 - 🎯 **Provider Profiles**: Pre-configured settings for popular SIP systems
-- 🔌 **MCP Server**: Integrate with Claude Code and other MCP clients
+- 🔌 **MCP Server**: Integrate with MCP clients like Claude Code
 - 📚 **TypeScript API**: Programmatic library for building voice applications
 - 📝 **Call Brief Processing**: Natural language call instructions using o3-mini model
 - 🎵 **Optional Call Recording**: Stereo WAV recording with caller/AI separation
@@ -238,7 +238,7 @@ Edit `config.json` with your settings:
 
 #### **Quick Setup with npx (Recommended)** 
 
-**Option 1: Using Claude Code CLI (Easiest)**
+**Option 1: Using MCP Client CLI (Easiest)**
 
 ```bash
 # Replace with your ACTUAL credentials before running:
@@ -282,7 +282,7 @@ For local development or if you prefer local installation:
 npm start --mcp
 ```
 
-Or configure with local installation:
+Or configure Claude Code with local installation:
 
 ```json
 {
@@ -300,10 +300,51 @@ Available MCP tools:
 - `simple_call` - Make calls with automatic instruction generation
 - `advanced_call` - Make calls with granular parameter control
 
-**Example usage in Claude Code:**
-> "Can you call Bocca di Bacco restaurant and book a table for 2 people tonight at 7:30pm? My name is John Doe."
+**Example usage in MCP Client:**
 
-Claude will automatically use the MCP server to make the call for you!
+```
+You: "Can you call Bocca di Bacco restaurant and book a table for 2 people tonight at 7:30pm? My name is John Doe."
+
+MCP Client: I'll call Bocca di Bacco restaurant to book a table for 2 people tonight at 7:30pm.
+
+🔧 mcp__ai-voice-agent__simple_call(
+  phone_number: "+1234567890",
+  brief: "Call Bocca di Bacco restaurant and book a table for 2 people tonight at 7:30pm",
+  caller_name: "John Doe"
+)
+
+✅ Call completed successfully! 
+📞 Duration: 2 minutes 15 seconds
+📝 Reservation confirmed for 2 people at 7:30pm tonight
+```
+
+**More examples:**
+
+```
+You: "My internet is down. Can you call my ISP and get a status update? I'm Sarah Johnson, account #12345."
+
+MCP Client: I'll call your internet service provider to check on the outage status.
+
+🔧 mcp__ai-voice-agent__simple_call(
+  phone_number: "+18005551234", 
+  brief: "Call ISP about internet outage, customer Sarah Johnson account #12345",
+  caller_name: "Sarah Johnson"
+)
+```
+
+```
+You: "Call Dr. Smith's office to reschedule my 3pm appointment to next week. I'm Mike Chen."
+
+MCP Client: I'll call Dr. Smith's office to reschedule your appointment.
+
+🔧 mcp__ai-voice-agent__simple_call(
+  phone_number: "+15551234567",
+  brief: "Call Dr. Smith's office to reschedule Mike Chen's 3pm appointment to next week", 
+  caller_name: "Mike Chen"
+)
+```
+
+The MCP Client automatically handles the entire conversation using the AI Voice Agent!
 
 ### 2. Command Line Interface
 
@@ -497,9 +538,42 @@ SESSION_REFRESHER=uac
 
 **Priority order:** CLI flags > Config file > Environment variables
 
+## ✅ Quick Success Check
+
+Before making real calls, validate your setup with these safe tests:
+
+### 1. Configuration Validation
+```bash
+# Basic validation - checks syntax and required fields
+npm run validate config.json
+
+# Detailed validation with network connectivity tests  
+npm run validate:detailed
+
+# Get specific fix suggestions for issues
+npm run validate:fix
+```
+
+### 2. Test Call to Yourself (Fritz!Box users)
+```bash
+# Call your own extension to verify audio quality (safe test)
+npm start call "**620" --brief "Test call to check audio quality" --user-name "Your Name" --duration 30
+
+# Or use your mobile number for end-to-end test
+npm start call "+49123456789" --brief "Quick test call" --user-name "Your Name" --duration 15
+```
+
+### 3. What to Expect
+- ✅ **Working setup**: Clear audio, proper AI responses, clean call termination
+- ⚠️ **Network issues**: "Connection failed" errors → check firewall/STUN settings  
+- ⚠️ **Auth problems**: "401 Unauthorized" → verify SIP credentials
+- ⚠️ **Codec issues**: Poor audio quality → G.722 compilation may have failed
+
+> **Pro tip**: Start with `--duration 30` for test calls to avoid long waits if something goes wrong.
+
 ## 📋 Configuration Validation
 
-Before making calls, validate your configuration:
+The built-in validation system provides comprehensive analysis:
 
 ```bash
 # Basic validation

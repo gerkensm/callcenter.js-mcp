@@ -89,7 +89,7 @@ Make a single phone call with the AI agent. This is the primary function for mos
 ```typescript
 import { makeCall } from 'ai-voice-agent';
 
-// Simple call with brief (recommended)
+// Restaurant reservation
 const result = await makeCall({
   number: '+1234567890',
   brief: 'Call Mario\'s Pizza and order 2 large pepperoni pizzas for delivery',
@@ -97,21 +97,37 @@ const result = await makeCall({
   config: 'config.json'
 });
 
-// Call with direct instructions
+// Medical appointment scheduling
 const result = await makeCall({
-  number: '+1234567890',
-  instructions: 'You are calling to make a restaurant reservation. Be polite and professional...',
+  number: '+1555123456',
+  brief: 'Call Dr. Smith\'s office to reschedule my Tuesday 2pm appointment to Friday morning',
+  userName: 'Jennifer Martinez',
   config: configObject
 });
 
-// Call with recording and duration limit
+// Customer service inquiry
 const result = await makeCall({
-  number: '+1234567890',
-  brief: 'Business conference call',
-  userName: 'John Smith',
-  recording: 'important-call.wav',
-  duration: 300,
-  logLevel: 'info'
+  number: '+18005551234',
+  brief: 'Call internet provider about slow speeds, reference ticket #45692',
+  userName: 'Mike Chen',
+  recording: true,
+  duration: 600
+});
+
+// Business meeting coordination
+const result = await makeCall({
+  number: '+14155987654',
+  brief: 'Call client to confirm tomorrow\'s 3pm project review meeting',
+  userName: 'Alex Thompson',
+  logLevel: 'quiet'
+});
+
+// Service cancellation
+const result = await makeCall({
+  number: '+18009876543',
+  brief: 'Cancel gym membership, account holder Jane Doe, membership ID 12345',
+  userName: 'Jane Doe',
+  recording: 'cancellation-proof.wav'
 });
 ```
 
@@ -190,6 +206,64 @@ interface CallOptions {
 }
 ```
 
+## Error Handling
+
+The API provides comprehensive error information to help diagnose issues:
+
+```typescript
+try {
+  const result = await makeCall({
+    number: '+1234567890',
+    brief: 'Test call',
+    config: 'config.json'
+  });
+  
+  if (result.success) {
+    console.log('✅ Call succeeded');
+    console.log(`Duration: ${result.duration}s`);
+    if (result.transcript) {
+      console.log('Transcript:', result.transcript);
+    }
+  } else {
+    // Call failed but was handled gracefully
+    console.log('❌ Call failed:', result.error);
+    
+    // Common failure scenarios:
+    if (result.error?.includes('401')) {
+      console.log('→ Check SIP credentials');
+    } else if (result.error?.includes('timeout')) {
+      console.log('→ Check network connectivity');
+    } else if (result.error?.includes('codec')) {
+      console.log('→ Audio codec negotiation failed');
+    }
+  }
+} catch (error) {
+  // System-level errors (configuration, network, etc.)
+  if (error.message.includes('Configuration')) {
+    console.error('Config error:', error.message);
+    console.log('→ Run: npm run validate config.json');
+  } else if (error.message.includes('Call brief error')) {
+    console.error('Brief processing failed:', error.message);
+    console.log('→ Check OpenAI API key and brief content');
+  } else if (error.message.includes('SIP')) {
+    console.error('SIP connection error:', error.message);
+    console.log('→ Check network and firewall settings');
+  } else {
+    console.error('Unexpected error:', error.message);
+  }
+}
+```
+
+### Common Error Scenarios
+
+| Error Type | Likely Cause | Solution |
+|------------|--------------|----------|
+| `401 Unauthorized` | Invalid SIP credentials | Verify username/password in config |
+| `Connection timeout` | Network/firewall issues | Check STUN servers, firewall rules |
+| `Codec negotiation failed` | Audio codec mismatch | Ensure G.722 compiled or enable G.711 fallback |
+| `Call brief error` | Invalid OpenAI API key | Verify API key has sufficient credits |
+| `Configuration invalid` | Missing required fields | Run `npm run validate config.json` |
+
 ### `CallResult`
 
 Return value from `makeCall()`.
@@ -261,6 +335,12 @@ Create a `config.json` file:
 }
 ```
 
+> **💡 Validation Tip**: Always validate your configuration before making calls:
+> ```bash
+> npm run validate config.json  # Basic validation
+> npm run validate:detailed     # With network tests
+> ```
+
 Then use it:
 
 ```typescript
@@ -310,6 +390,11 @@ SIP_SERVER_PORT=5060
 SIP_LOCAL_PORT=5060
 OPENAI_VOICE=alloy
 ```
+
+> **⚠️ Environment Setup**: When using environment variables, test your setup first:
+> ```bash
+> npx ai-voice-agent validate  # Validates env vars
+> ```
 
 Then:
 
