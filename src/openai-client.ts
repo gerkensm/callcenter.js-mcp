@@ -31,6 +31,8 @@ export class OpenAIClient extends EventEmitter {
   private pendingTranscripts: Map<string, string> = new Map();
   // Map item_id to response_id for accurate truncation handling
   private itemToResponseMap: Map<string, string> = new Map();
+  // Track responses whose audio playback has completed before transcript was ready
+  private playbackCompleted: Set<string> = new Set();
   // Safety cleanup timers to prevent memory leaks
   private cleanupTimers: Map<string, NodeJS.Timeout> = new Map();
   private perfStats = {
@@ -417,6 +419,12 @@ export class OpenAIClient extends EventEmitter {
             if (tracker && !this.canceledResponses.has(responseId)) {
               const fullTranscript = tracker.getFullTranscript();
               if (fullTranscript) {
+                // If playback already finished earlier, log immediately now
+                if (this.playbackCompleted.has(responseId)) {
+                  this.pendingTranscripts.set(responseId, fullTranscript);
+                  this.logQueuedTranscript(responseId);
+                  break;
+                }
                 // If text-only response, log immediately
                 if (!tracker.hasAudio()) {
                   logger.transcript("assistant", fullTranscript, false);
@@ -433,6 +441,12 @@ export class OpenAIClient extends EventEmitter {
             } else if (this.canceledResponses.has(responseId)) {
               // This response was interrupted - will be logged in truncation handler
               logger.ai.debug(`Skipping interrupted response ${responseId}`, "AI");
+            }
+            
+            // If playback already finished but transcript wasn't ready, try to flush now
+            if (responseId && this.playbackCompleted.has(responseId)) {
+              logger.ai.debug(`Playback finished earlier; flushing transcript for ${responseId} on response.done`, "AI");
+              this.logQueuedTranscript(responseId);
             }
             
             // Only set up safety cleanup timer for responses that still need it
@@ -920,12 +934,28 @@ export class OpenAIClient extends EventEmitter {
    * Log a queued transcript when audio playback finishes
    */
   public logQueuedTranscript(responseId: string): void {
-    const queuedTranscript = this.pendingTranscripts.get(responseId);
-    if (queuedTranscript) {
-      getLogger().transcript("assistant", queuedTranscript, false);
+    const transcript = this.pendingTranscripts.get(responseId);
+    if (transcript && transcript.trim().length > 0) {
+      // We finally have the transcript and playback finished (either now or earlier)
+      getLogger().transcript("assistant", transcript, false);
       this.pendingTranscripts.delete(responseId);
-      // Clean up immediately after successful transcript logging
+      this.playbackCompleted.delete(responseId);
       this.cleanupResponse(responseId);
+      return;
+    }
+    // Transcript not ready yet: mark playback completed so we can log when it arrives
+    if (!this.playbackCompleted.has(responseId)) {
+      getLogger().ai.debug(`Playback completed before transcript ready for ${responseId} - will log on response.done`, "AI");
+      this.playbackCompleted.add(responseId);
+    }
+    // Optionally, as a fallback if the response is text-only and already fully accumulated in the tracker:
+    const tracker = this.responseTrackers.get(responseId);
+    if (tracker && !tracker.hasAudio()) {
+      const full = tracker.getFullTranscript();
+      if (full && full.trim().length > 0) {
+        this.pendingTranscripts.set(responseId, full);
+        this.logQueuedTranscript(responseId);
+      }
     }
   }
 
@@ -962,6 +992,7 @@ export class OpenAIClient extends EventEmitter {
     // Clean up all tracking data
     this.responseTrackers.delete(responseId);
     this.canceledResponses.delete(responseId);
+    this.playbackCompleted.delete(responseId);
     this.pendingTranscripts.delete(responseId);
     
     // Clean up item mapping (scan and remove entries pointing to this response)

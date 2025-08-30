@@ -38,6 +38,7 @@ export class AudioBridge extends EventEmitter {
     packetsQueued: number;
     packetsSent: number;
     callback?: () => void;
+    safetyTimeout?: NodeJS.Timeout;
   }> = new Map();
   private currentResponseId?: string;
   private rtpSendInterval: NodeJS.Timeout | null = null;
@@ -581,9 +582,14 @@ export class AudioBridge extends EventEmitter {
           
           // Execute callback after a small delay to ensure audio has been heard
           setTimeout(() => {
-            tracking.callback!();
+            const finalCallback = tracking.callback!;
+            // Clear safety timeout if it exists
+            if (tracking.safetyTimeout) {
+              clearTimeout(tracking.safetyTimeout);
+            }
             // Clean up tracking for completed responses
             this.responseAudioTracking.delete(responseId);
+            finalCallback(); // This will clear the safety timeout through wrappedCallback (backup)
           }, 100); // 100ms safety margin for network/playback latency
           
           break; // Only one response can own this packet
@@ -594,11 +600,16 @@ export class AudioBridge extends EventEmitter {
 
   public cancelPendingCallbacks(): void {
     getLogger().audio.debug("Canceling all pending response callbacks", "AUDIO");
-    // Clear all callbacks without executing them
+    // Clear all callbacks and safety timeouts without executing them
     for (const [responseId, tracking] of this.responseAudioTracking) {
       if (tracking.callback) {
         getLogger().audio.debug(`Canceled callback for response ${responseId}`, "AUDIO");
         tracking.callback = undefined;
+      }
+      if (tracking.safetyTimeout) {
+        getLogger().audio.debug(`Cleared safety timeout for response ${responseId}`, "AUDIO");
+        clearTimeout(tracking.safetyTimeout);
+        tracking.safetyTimeout = undefined;
       }
     }
   }
@@ -661,15 +672,47 @@ export class AudioBridge extends EventEmitter {
   public notifyWhenResponseComplete(responseId: string, callback: () => void): void {
     getLogger().audio.debug(`Setting up completion callback for response ${responseId}`, "AUDIO");
     const tracking = this.responseAudioTracking.get(responseId);
+    
+    // Set up a safety timeout to prevent hanging calls
+    const timeoutMs = 10000; // 10 second timeout
+    const safetyTimeout = setTimeout(() => {
+      getLogger().audio.warn(`Safety timeout triggered for response ${responseId} - executing callback anyway`, "AUDIO");
+      this.responseAudioTracking.delete(responseId);
+      callback();
+    }, timeoutMs);
+    
+    // Wrap the callback to clear the timeout
+    const wrappedCallback = () => {
+      clearTimeout(safetyTimeout);
+      callback();
+    };
+    
     if (tracking) {
-      tracking.callback = callback;
+      // Clear any existing timeout
+      if (tracking.safetyTimeout) {
+        clearTimeout(tracking.safetyTimeout);
+      }
+      tracking.callback = wrappedCallback;
+      tracking.safetyTimeout = safetyTimeout;
       getLogger().audio.debug(`Response tracking: ${tracking.packetsSent}/${tracking.packetsQueued} packets sent`, "AUDIO");
       
       // Check if already complete
       if (tracking.packetsSent === tracking.packetsQueued && tracking.packetsQueued > 0) {
         getLogger().audio.debug(`Response already complete, executing callback`, "AUDIO");
+        clearTimeout(safetyTimeout);
         setTimeout(callback, 100);
         this.responseAudioTracking.delete(responseId);
+      } else if (tracking.packetsQueued === 0) {
+        // Special case: if no packets are queued after a short delay, assume no audio and execute callback
+        setTimeout(() => {
+          const updatedTracking = this.responseAudioTracking.get(responseId);
+          if (updatedTracking && updatedTracking.packetsQueued === 0) {
+            getLogger().audio.debug(`No audio packets for response ${responseId}, executing callback`, "AUDIO");
+            clearTimeout(safetyTimeout);
+            this.responseAudioTracking.delete(responseId);
+            callback();
+          }
+        }, 500); // Wait 500ms for audio to arrive
       }
     } else {
       // Create tracking entry if it doesn't exist yet
@@ -677,8 +720,20 @@ export class AudioBridge extends EventEmitter {
       this.responseAudioTracking.set(responseId, {
         packetsQueued: 0,
         packetsSent: 0,
-        callback,
+        callback: wrappedCallback,
+        safetyTimeout: safetyTimeout,
       });
+      
+      // Special case: if no packets arrive within a short time, execute callback anyway
+      setTimeout(() => {
+        const updatedTracking = this.responseAudioTracking.get(responseId);
+        if (updatedTracking && updatedTracking.packetsQueued === 0 && updatedTracking.callback) {
+          getLogger().audio.debug(`No audio packets received for response ${responseId}, executing callback`, "AUDIO");
+          clearTimeout(safetyTimeout);
+          this.responseAudioTracking.delete(responseId);
+          callback();
+        }
+      }, 500); // Wait 500ms for audio to arrive
     }
   }
 
