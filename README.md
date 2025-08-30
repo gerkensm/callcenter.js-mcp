@@ -4,17 +4,7 @@
 
 Just tell Claude what you want to accomplish, and it will call and handle the conversation for you. This is essentially an MCP Server that bridges between OpenAI's Real-Time Voice API and your VoIP connection to call people on your behalf.
 
-## 📚 Quick Context for the Uninitiated
-
-**VoIP (Voice over IP)** is how you make phone calls over the internet instead of traditional phone lines. **SIP (Session Initiation Protocol)** is the language these systems speak to connect calls. Think of it as HTTP but for phone calls.
-
-**Fritz!Box** is a popular German router/modem that happens to have a built-in phone system (PBX). If you have one, you already have everything you need to make VoIP calls - this tool just connects to it. Outside Germany, you might know similar devices from other brands, or use dedicated VoIP services like Asterisk, 3CX, or cloud providers.
-
-**MCP (Model Context Protocol)** is Anthropic's standard for connecting AI assistants like Claude to external tools and services. It's what lets MCP clients actually *do* things instead of just talking about them.
-
 > **⚠️ Vibe-coded side project!** Please do not use this in any kind of professional context. This is a side project coded in a weekend. There are no guard rails. Your MCP client can call *any* number with this, even if you don't ask it to. In fact, it has done so during testing - it called a random number during the night "for testing" and played back scary low-pitched noises - then claimed it called MY number. So YMMV, no warranties. See [disclaimer](#️-important-disclaimer) below.
-
-
 
 ## 📞 Example: Order Pizza with Claude
 
@@ -48,6 +38,14 @@ Just tell Claude what you want to accomplish, and it will call and handle the co
 ```
 
 **Pizza ordered successfully!** 🍕
+
+## 📚 Quick Context for the Uninitiated
+
+**VoIP (Voice over IP)** is how you make phone calls over the internet instead of traditional phone lines. **SIP (Session Initiation Protocol)** is the language these systems speak to connect calls. Think of it as HTTP but for phone calls.
+
+**Fritz!Box** is a popular German router/modem that happens to have a built-in phone system (PBX). If you have one, you already have everything you need to make VoIP calls - this tool just connects to it. Outside Germany, you might know similar devices from other brands, or use dedicated VoIP services like Asterisk, 3CX, or cloud providers.
+
+**MCP (Model Context Protocol)** is Anthropic's standard for connecting AI assistants like Claude to external tools and services. It's what lets MCP clients actually *do* things instead of just talking about them.
 
 ## 🚀 What This Enables
 
