@@ -17,7 +17,7 @@ import { makeCall, CallOptions, CallResult } from './index.js';
  */
 const SIMPLE_CALL_TOOL = {
   name: "simple_call",
-  description: "Make an AI-powered phone call with automatic instruction generation. Requires a brief description, your name, and phone number. The system will use OpenAI's o3 model to generate detailed instructions.\n\nWhy this works better than manual instructions: OpenAI's real-time voice models are optimized for speed, not sophistication. They struggle with complex, goal-oriented tasks without very specific instructions. The o3 model automatically transforms your simple brief (like 'Call the restaurant and book a table for 2 at 7pm') into sophisticated, detailed instructions with conversation states, fallback strategies, and appropriate tone - saving you from writing lengthy manual instructions while achieving much better call results.",
+  description: "Make an AI-powered phone call with automatic instruction generation. Requires a brief description, your name, and phone number. The system will use OpenAI's o3 model to generate detailed instructions.\n\nWhy this works better than manual instructions: OpenAI's real-time voice models are optimized for speed, not sophistication. They struggle with complex, goal-oriented tasks without very specific instructions. The o3 model automatically transforms your simple brief (like 'Call the restaurant and book a table for 2 at 7pm') into sophisticated, detailed instructions with conversation states, fallback strategies, and appropriate tone - saving you from writing lengthy manual instructions while achieving much better call results. IMPORTANT: for the brief, use the language the call will be held in - the language of the call will be inferred from the brief!",
   inputSchema: {
     type: "object",
     properties: {
@@ -28,7 +28,7 @@ const SIMPLE_CALL_TOOL = {
       },
       brief: {
         type: "string",
-        description: "Brief description of what you want to accomplish on the call. Be specific about the goal, context, and any important details. Example: 'Call Bocca di Bacco restaurant and book a table for 2 people at 19:30 today for dinner. Mention dietary restrictions: vegetarian options needed.'",
+        description: "Brief description of what you want to accomplish on the call. Be specific about the goal, context, and any important details. Example: 'Call Bocca di Bacco restaurant and book a table for 2 people at 19:30 today for dinner. Mention dietary restrictions: vegetarian options needed.'. IMPORTANT: for the brief, use the language the call will be held in - the language of the call will be inferred from the brief!",
         minLength: 20,
         maxLength: 10000
       },
