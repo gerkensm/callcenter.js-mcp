@@ -30,10 +30,10 @@ export class AudioBridge extends EventEmitter {
   private stereoWavWriter: Writer | null = null;
   private currentRecordingFilename: string | null = null;
   private callRecordingEnabled: boolean = true;
-  private audioMixer: AudioMixer | null = null;
+  private stereoRecorder: RealTimeStereoRecorder | null = null;
   private packetCount: number = 0;
   private sendCount: number = 0;
-  private rtpPacketQueue: Buffer[] = [];
+  private rtpPacketQueue: { packet: Buffer; pcm: Int16Array }[] = [];
   private responseAudioTracking: Map<string, {
     packetsQueued: number;
     packetsSent: number;
@@ -161,12 +161,15 @@ export class AudioBridge extends EventEmitter {
       this.outgoingWavWriter = null;
       getLogger().audio.debug("Outgoing audio saved to outgoing-audio-*.wav");
     }
-    if (this.stereoWavWriter) {
-      // Flush any remaining audio in the mixer
-      if (this.audioMixer) {
-        this.audioMixer.flush();
-        this.audioMixer = null;
+    if (this.stereoRecorder) {
+      try {
+        this.stereoRecorder.stop();
+      } catch (e) {
+        getLogger().audio.warn(`Error while stopping stereo recorder: ${e instanceof Error ? e.message : String(e)}`);
       }
+      this.stereoRecorder = null;
+    }
+    if (this.stereoWavWriter) {
       this.stereoWavWriter.end();
       this.stereoWavWriter = null;
       getLogger().audio.info(
@@ -242,12 +245,9 @@ export class AudioBridge extends EventEmitter {
           getLogger().rtp.verbose(`RTP: ${this.packetCount} packets received`);
         }
 
-        // Record caller audio to stereo left channel
-        if (this.audioMixer && this.callRecordingEnabled) {
-          this.audioMixer.addCallerAudio(
-            pcm16Audio,
-            this.negotiatedCodec.sampleRate
-          );
+        // Record caller audio to stereo left channel at EXACT negotiated sample rate
+        if (this.stereoRecorder && this.callRecordingEnabled) {
+          this.stereoRecorder.addCallerAudio(pcm16Audio, this.negotiatedCodec.sampleRate);
         }
 
         // Upsample to 24kHz for OpenAI (depends on codec sample rate)
@@ -357,10 +357,6 @@ export class AudioBridge extends EventEmitter {
         this.perfStats.resampleTimes.shift();
       }
 
-      // Record OpenAI audio to stereo right channel (before resampling, at 24kHz)
-      if (this.audioMixer && this.callRecordingEnabled) {
-        this.audioMixer.addAIAudio(audioData);
-      }
 
       // Minimal logging to avoid event loop blocking
       if (++this.sendCount % 100 === 0) {
@@ -384,7 +380,7 @@ export class AudioBridge extends EventEmitter {
 
     // Calculate samples per packet based on codec sample rate (10ms packets)
     const samplesPerPacket = this.negotiatedCodec.sampleRate / 100;
-    const packetsToSend: Buffer[] = [];
+    const packetsToSend: { packet: Buffer; pcm: Int16Array }[] = [];
 
     for (let i = 0; i < audioData.length; i += samplesPerPacket) {
       const chunk = audioData.slice(i, i + samplesPerPacket);
@@ -405,7 +401,8 @@ export class AudioBridge extends EventEmitter {
         isFirstPacket
       );
 
-      packetsToSend.push(rtpPacket);
+      // Queue the RTP packet together with its PCM (what we'll record when we actually send)
+      packetsToSend.push({ packet: rtpPacket, pcm: chunk });
 
       // Update timestamp for next packet using codec clock rate
       const timestampIncrement = Math.round(
@@ -421,7 +418,8 @@ export class AudioBridge extends EventEmitter {
         `Initial burst: sending ${burstSize} packets for jitter buffer`
       );
       for (let i = 0; i < burstSize; i++) {
-        this.sendPacketImmediately(packetsToSend.shift()!);
+        const entry = packetsToSend.shift()!;
+        this.sendQueuedEntryImmediately(entry);
       }
       this.needsInitialBurst = false;
     }
@@ -495,21 +493,17 @@ export class AudioBridge extends EventEmitter {
       // --- End Performance Monitoring ---
 
       if (this.rtpPacketQueue.length > 0) {
-        const packet = this.rtpPacketQueue.shift()!;
-        
-        // Track packet sending for response completion detection
+        const entry = this.rtpPacketQueue.shift()!;
+        // Record exactly what we're actually sending (PCM at negotiated sample rate)
+        if (this.stereoRecorder && this.callRecordingEnabled && this.negotiatedCodec) {
+          this.stereoRecorder.addAIAudio(entry.pcm, this.negotiatedCodec.sampleRate);
+        }
         this.trackPacketSent();
-        
-        this.sendSocket!.send(
-          packet,
-          this.config.remoteRtpPort,
-          this.config.remoteRtpHost,
-          (err) => {
-            if (err) {
-              getLogger().rtp.error("Error sending RTP packet:", err);
-            }
+        this.sendSocket!.send(entry.packet, this.config.remoteRtpPort, this.config.remoteRtpHost, (err) => {
+          if (err) {
+            getLogger().rtp.error("Error sending RTP packet:", err);
           }
-        );
+        });
 
         // Warn if the buffer is getting low
         // if (this.rtpPacketQueue.length < 10) {
@@ -520,7 +514,6 @@ export class AudioBridge extends EventEmitter {
         // }
       } else if (this.negotiatedCodec) {
         // Queue is empty (underrun). Inject silence to maintain a smooth RTP stream.
-        // getLogger().rtp.debug(`Queue starvation: No packets available, injecting silence.`);
         const samplesPerPacket = this.negotiatedCodec.sampleRate / 100;
         const silenceData = new Int16Array(samplesPerPacket).fill(0);
         const encodedSilence = this.negotiatedCodec.encode(silenceData);
@@ -529,6 +522,10 @@ export class AudioBridge extends EventEmitter {
           this.rtpTimestamp,
           this.negotiatedCodec.payloadType
         );
+        // Also record the silence we send, to keep the timeline exact
+        if (this.stereoRecorder && this.callRecordingEnabled) {
+          this.stereoRecorder.addAIAudio(silenceData, this.negotiatedCodec.sampleRate);
+        }
         this.sendSocket!.send(
           silencePacket,
           this.config.remoteRtpPort,
@@ -685,14 +682,19 @@ export class AudioBridge extends EventEmitter {
     }
   }
 
-  private sendPacketImmediately(packet: Buffer): void {
+  private sendQueuedEntryImmediately(entry: { packet: Buffer; pcm: Int16Array }): void {
     if (!this.sendSocket) return;
     
     // Track packet sending for immediate sends too
     this.trackPacketSent();
 
+    // Record exactly what we're sending right now
+    if (this.stereoRecorder && this.callRecordingEnabled && this.negotiatedCodec) {
+      this.stereoRecorder.addAIAudio(entry.pcm, this.negotiatedCodec.sampleRate);
+    }
+
     this.sendSocket.send(
-      packet,
+      entry.packet,
       this.config.remoteRtpPort,
       this.config.remoteRtpHost,
       (err) => {
@@ -893,10 +895,10 @@ export class AudioBridge extends EventEmitter {
     // Reset buffer size to reasonable default for new conversation
     this.dynamicBufferSize = Math.max(30, this.dynamicBufferSize - 10);
 
-    // Clear audio mixer buffers to stop recording interrupted OpenAI audio
-    if (this.audioMixer) {
-      this.audioMixer.clearBuffers();
-    }
+    // IMPORTANT: Do NOT clear stereo recorder buffers here.
+    // We want WAV to reflect the real call timeline including interruptions.
+    // Previously this would cut planned but unplayed audio; now we only record
+    // what we actually sent (post-resampling) and what we actually received.
 
     getLogger().audio.debug(
       `Audio interruption: cleared ${clearedPackets} RTP packets from queue, reset burst flag, buffer size: ${this.dynamicBufferSize}`
@@ -982,14 +984,11 @@ export class AudioBridge extends EventEmitter {
       this.stereoWavWriter.pipe(callRecordingFile);
       this.currentRecordingFilename = filename;
 
-      // Initialize audio mixer for synchronized stereo recording
-      this.audioMixer = new AudioMixer(
-        this.stereoWavWriter,
-        this.audioProcessor
-      );
+      // Initialize real-time stereo recorder with a true timeline
+      this.stereoRecorder = new RealTimeStereoRecorder(this.stereoWavWriter, this.audioProcessor);
 
       getLogger().audio.info(
-        `Stereo call recording started: ${filename} (Left: caller, Right: AI)`
+        `Stereo call recording started: ${filename} (Left: caller, Right: AI) - real-time timeline`
       );
     } catch (error) {
       getLogger().audio.error("Failed to setup stereo call recording:", error);
@@ -1058,121 +1057,164 @@ export class AudioBridge extends EventEmitter {
   }
 }
 
-class AudioMixer {
+/**
+ * Real-time stereo recorder that writes a continuous timeline at 24 kHz.
+ * - Left channel: remote/caller audio (what we received), resampled to 24k
+ * - Right channel: AI audio actually sent to the callee (post-resampling), resampled to 24k
+ * - Pads silence on either side to preserve realistic timing and interruptions.
+ */
+class RealTimeStereoRecorder {
   private wavWriter: Writer;
-  private callerBuffer: Int16Array = new Int16Array(0);
-  private aiBuffer: Int16Array = new Int16Array(0);
-  private readonly FRAME_SIZE = 480; // 20ms at 24kHz
   private audioProcessor: AudioProcessor;
+  private readonly SAMPLE_RATE = 24000;
+  private readonly FRAME_MS = 20;
+  private readonly FRAME_SAMPLES = (this.SAMPLE_RATE / 1000) * this.FRAME_MS; // 480
+  private timer: NodeJS.Timeout | null = null;
+  private pausedForBackpressure = false;
+
+  // Per-channel queues of Int16Array chunks
+  private callerQueue: ChunkQueue = new ChunkQueue();
+  private aiQueue: ChunkQueue = new ChunkQueue();
 
   constructor(wavWriter: Writer, audioProcessor: AudioProcessor) {
     this.wavWriter = wavWriter;
     this.audioProcessor = audioProcessor;
+    this.startTimer();
   }
 
-  addCallerAudio(audio: Int16Array, codecSampleRate: number): void {
-    // Upsample to 24kHz if needed
-    let upsampled: Int16Array;
-    if (codecSampleRate === 16000) {
-      upsampled = this.audioProcessor.resample16kTo24k(audio);
-    } else {
-      upsampled = this.audioProcessor.resample8kTo24k(audio);
+  addCallerAudio(audio: Int16Array, srcSampleRate: number): void {
+    // Normalize to 24kHz for the timeline
+    const resampled = this.resampleTo24k(audio, srcSampleRate);
+    this.callerQueue.enqueue(resampled);
+  }
+
+  addAIAudio(audio: Int16Array, srcSampleRate: number): void {
+    // Normalize to 24kHz for the timeline
+    const resampled = this.resampleTo24k(audio, srcSampleRate);
+    this.aiQueue.enqueue(resampled);
+  }
+
+  stop(): void {
+    // Drain any remaining frames until both buffers are empty
+    while (!this.callerQueue.isEmpty() || !this.aiQueue.isEmpty()) {
+      if (!this.writeNextFrame()) {
+        // If backpressure, wait for drain synchronously (rare with small frames)
+        break;
+      }
+    }
+    this.stopTimer();
+  }
+
+  private startTimer(): void {
+    if (this.timer) return;
+    const tick = () => {
+      if (this.pausedForBackpressure) return;
+      const ok = this.writeNextFrame();
+      if (!ok) {
+        // Pause on backpressure until 'drain'
+        this.pausedForBackpressure = true;
+        this.wavWriter.once('drain', () => {
+          this.pausedForBackpressure = false;
+          // Immediately write next frame after drain to catch up
+          setImmediate(tick);
+        });
+        return;
+      }
+      this.timer = setTimeout(tick, this.FRAME_MS);
+    };
+    this.timer = setTimeout(tick, this.FRAME_MS);
+  }
+
+  private stopTimer(): void {
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+  }
+
+  private resampleTo24k(audio: Int16Array, srcRate: number): Int16Array {
+    if (srcRate === 24000) return audio;
+    if (srcRate === 16000) return this.audioProcessor.resample16kTo24k(audio);
+    if (srcRate === 8000) return this.audioProcessor.resample8kTo24k(audio);
+    // Fallback: no resample if unknown (shouldn't happen)
+    return audio;
+  }
+
+  private writeNextFrame(): boolean {
+    // Pull a fixed 20ms frame from each channel; pad with zeros if not enough
+    const left = this.callerQueue.pull(this.FRAME_SAMPLES);
+    const right = this.aiQueue.pull(this.FRAME_SAMPLES);
+
+    const stereo = new Int16Array(this.FRAME_SAMPLES * 2);
+    for (let i = 0; i < this.FRAME_SAMPLES; i++) {
+      stereo[i * 2] = left[i] || 0;      // Left channel: caller
+      stereo[i * 2 + 1] = right[i] || 0; // Right channel: AI
     }
 
-    // Append to caller buffer
-    const newBuffer = new Int16Array(
-      this.callerBuffer.length + upsampled.length
+    const audioBuffer = Buffer.from(
+      stereo.buffer,
+      stereo.byteOffset,
+      stereo.byteLength
     );
-    newBuffer.set(this.callerBuffer);
-    newBuffer.set(upsampled, this.callerBuffer.length);
-    this.callerBuffer = newBuffer;
 
-    this.processFrames();
+    return this.wavWriter.write(audioBuffer);
+  }
+}
+
+/**
+ * Simple chunk queue for Int16 PCM with pull semantics (pads with zeros when empty).
+ */
+class ChunkQueue {
+  private chunks: Int16Array[] = [];
+  private headIndex = 0; // index into first chunk
+
+  enqueue(chunk: Int16Array): void {
+    if (chunk && chunk.length > 0) {
+      this.chunks.push(chunk);
+    }
   }
 
-  addAIAudio(audio: Int16Array): void {
-    // Append to AI buffer (already 24kHz)
-    const newBuffer = new Int16Array(this.aiBuffer.length + audio.length);
-    newBuffer.set(this.aiBuffer);
-    newBuffer.set(audio, this.aiBuffer.length);
-    this.aiBuffer = newBuffer;
-
-    this.processFrames();
+  isEmpty(): boolean {
+    return this.totalLength() === 0;
   }
 
-  private processFrames(): void {
-    // Process complete frames while we have enough data from both streams
-    const minAvailable = Math.min(
-      this.callerBuffer.length,
-      this.aiBuffer.length
-    );
-    const framesToProcess = Math.floor(minAvailable / this.FRAME_SIZE);
+  totalLength(): number {
+    let len = 0;
+    if (this.chunks.length === 0) return 0;
+    len += (this.chunks[0].length - this.headIndex);
+    for (let i = 1; i < this.chunks.length; i++) {
+      len += this.chunks[i].length;
+    }
+    return len;
+  }
 
-    for (let frame = 0; frame < framesToProcess; frame++) {
-      const frameStart = frame * this.FRAME_SIZE;
-      const frameEnd = frameStart + this.FRAME_SIZE;
+  pull(n: number): Int16Array {
+    const out = new Int16Array(n);
+    let outPos = 0;
 
-      // Create stereo frame
-      const stereoFrame = new Int16Array(this.FRAME_SIZE * 2);
-      for (let i = 0; i < this.FRAME_SIZE; i++) {
-        stereoFrame[i * 2] = this.callerBuffer[frameStart + i]; // Left: caller
-        stereoFrame[i * 2 + 1] = this.aiBuffer[frameStart + i]; // Right: AI
+    while (outPos < n) {
+      if (this.chunks.length === 0) {
+        // Pad remaining with zeros
+        // out is already zero-initialized
+        break;
       }
 
-      // Write to WAV
-      const audioBuffer = Buffer.from(
-        stereoFrame.buffer,
-        stereoFrame.byteOffset,
-        stereoFrame.byteLength
-      );
-      this.wavWriter.write(audioBuffer);
+      const head = this.chunks[0];
+      const available = head.length - this.headIndex;
+      const needed = n - outPos;
+      const toCopy = Math.min(available, needed);
+
+      out.set(head.subarray(this.headIndex, this.headIndex + toCopy), outPos);
+      this.headIndex += toCopy;
+      outPos += toCopy;
+
+      if (this.headIndex >= head.length) {
+        // Move to next chunk
+        this.chunks.shift();
+        this.headIndex = 0;
+      }
     }
 
-    // Remove processed samples
-    const samplesToRemove = framesToProcess * this.FRAME_SIZE;
-    if (samplesToRemove > 0) {
-      this.callerBuffer = this.callerBuffer.slice(samplesToRemove);
-      this.aiBuffer = this.aiBuffer.slice(samplesToRemove);
-    }
-  }
-
-  flush(): void {
-    // Process any remaining samples with zero-padding for the shorter buffer
-    const maxLength = Math.max(this.callerBuffer.length, this.aiBuffer.length);
-    if (maxLength === 0) return;
-
-    // Pad shorter buffer with zeros
-    const paddedCaller = new Int16Array(maxLength);
-    const paddedAI = new Int16Array(maxLength);
-
-    paddedCaller.set(this.callerBuffer);
-    paddedAI.set(this.aiBuffer);
-
-    // Create final stereo frames
-    const stereoFrame = new Int16Array(maxLength * 2);
-    for (let i = 0; i < maxLength; i++) {
-      stereoFrame[i * 2] = paddedCaller[i]; // Left: caller
-      stereoFrame[i * 2 + 1] = paddedAI[i]; // Right: AI
-    }
-
-    // Write to WAV
-    const audioBuffer = Buffer.from(
-      stereoFrame.buffer,
-      stereoFrame.byteOffset,
-      stereoFrame.byteLength
-    );
-    this.wavWriter.write(audioBuffer);
-
-    // Clear buffers
-    this.callerBuffer = new Int16Array(0);
-    this.aiBuffer = new Int16Array(0);
-  }
-
-  clearBuffers(): void {
-    // Clear both audio buffers without writing remaining data
-    // Used during interruptions to stop recording abruptly stopped audio
-    this.callerBuffer = new Int16Array(0);
-    this.aiBuffer = new Int16Array(0);
-    getLogger().audio.debug("Audio mixer buffers cleared due to interruption");
+    return out;
   }
 }
