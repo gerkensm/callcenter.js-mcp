@@ -57,6 +57,55 @@ Just tell Claude what you want to accomplish, and it will call and handle the co
 
 Built as a bridge between OpenAI's Real-Time Voice API and VoIP networks, with multiple codec support (G.722, G.711), and expanded SIP protocol support for broad VoIP compatibility. Compatible with the latest `gpt-realtime` model released August 28, 2025.
 
+## 🏗️ System Architecture
+
+```mermaid
+graph TB
+    subgraph "User Interface"
+        A[Claude Code/MCP Client]
+        B[CLI Tool]
+        C[TypeScript API]
+    end
+    
+    subgraph "CallCenter.js Core"
+        D[MCP Server]
+        E[VoiceAgent]
+        F[Call Brief Processor<br/>o3-mini model]
+    end
+    
+    subgraph "Communication Layer"
+        G[SIP Client<br/>Provider Support]
+        H[Audio Bridge<br/>RTP Streaming]
+    end
+    
+    subgraph "Audio Processing"
+        I[G.722 Codec<br/>16kHz Wideband]
+        J[G.711 Codec<br/>8kHz Fallback]
+    end
+    
+    subgraph "External Services"
+        K[OpenAI Real-Time API<br/>gpt-realtime model]
+        L[VoIP Network<br/>Fritz!Box/Asterisk/etc]
+    end
+    
+    A --> D
+    B --> E
+    C --> E
+    D --> E
+    E --> F
+    E --> G
+    E --> H
+    F --> K
+    G --> L
+    H --> I
+    H --> J
+    H --> K
+    
+    style F fill:#e1f5fe
+    style K fill:#fff3e0
+    style L fill:#f3e5f5
+```
+
 > **⚠️ Vibe-coded project!** Developed and tested on Fritz!Box (a German router with built-in VoIP) only. Other provider configs are research-based but untested. YMMV, no warranties. See [disclaimer](#️-important-disclaimer) below.
 
 ![100% vibe-coded](./assets/vibe-coded.svg)
@@ -502,6 +551,43 @@ The provider profiles are based on research and documentation, not actual testin
 | **Cisco CUCM** | TCP preferred | STUN required | Required | Required | OPTIONS ping |
 | **3CX** | TCP/UDP | STUN | Supported | Optional | Re-register |
 
+### Configuration Decision Tree
+
+```mermaid
+flowchart TD
+    A[Choose Your SIP Provider] --> B{Fritz!Box Router?}
+    B -->|Yes| C[✅ Use fritz-box profile<br/>UDP transport<br/>No STUN needed]
+    B -->|No| D{Enterprise System?}
+    
+    D -->|Cisco CUCM| E[⚠️ Use cisco profile<br/>TCP transport<br/>STUN required<br/>Session timers + PRACK]
+    D -->|3CX| F[⚠️ Use 3cx profile<br/>TCP/UDP transport<br/>STUN recommended]
+    D -->|Asterisk/FreePBX| G[⚠️ Use asterisk profile<br/>UDP/TCP transport<br/>STUN for NAT]
+    D -->|Other| H[⚠️ Use generic profile<br/>Start with UDP<br/>Add STUN if needed]
+    
+    C --> I[Configure Basic Settings]
+    E --> J[Configure Enterprise Settings]
+    F --> J
+    G --> J
+    H --> J
+    
+    I --> K[Set SIP credentials<br/>serverIp = router IP<br/>typically 192.168.1.1]
+    J --> L[Set SIP credentials<br/>serverIp = server IP<br/>Add STUN servers]
+    
+    K --> M{Network Location?}
+    L --> M
+    
+    M -->|Local Network| N[✅ Basic setup complete<br/>Should work reliably]
+    M -->|Cloud/Remote| O[❓ May need additional<br/>STUN/TURN configuration]
+    
+    style C fill:#c8e6c9
+    style E fill:#ffecb3
+    style F fill:#ffecb3
+    style G fill:#ffecb3
+    style H fill:#ffecb3
+    style N fill:#c8e6c9
+    style O fill:#ffe0b2
+```
+
 ### 📝 **Configuration Examples**
 
 The project includes ready-to-use configurations for all major providers:
@@ -578,6 +664,59 @@ The system uses OpenAI's **o3-mini reasoning model** (their latest small reasoni
 4. **Handles edge cases** like voicemail, objections, and alternatives
 5. **Adapts language and tone** based on context
 6. **Provides fallback strategies** when things don't go as planned
+
+### Call Flow Sequence
+
+```mermaid
+sequenceDiagram
+    participant U as User/Claude
+    participant V as VoiceAgent
+    participant B as Brief Processor<br/>(o3-mini)
+    participant S as SIP Client
+    participant A as Audio Bridge
+    participant O as OpenAI Realtime<br/>(gpt-realtime)
+    participant P as Phone/VoIP
+
+    U->>V: makeCall({brief, number, userName})
+    V->>B: Process brief with o3-mini
+    B->>B: Generate detailed instructions<br/>& conversation states
+    B->>V: Sophisticated call instructions
+    
+    V->>S: Connect to SIP server
+    S->>P: INVITE (start call)
+    P->>S: 200 OK (call answered)
+    S->>V: Call established
+    
+    V->>A: Initialize audio bridge
+    V->>O: Connect to OpenAI Realtime
+    O->>V: WebSocket connected
+    V->>O: Send generated instructions
+    
+    loop During Call
+        P->>A: RTP audio packets
+        A->>A: Decode G.722/G.711 → PCM
+        A->>O: Stream PCM audio
+        O->>O: Process speech → text
+        O->>O: Generate AI response
+        O->>A: Stream AI audio (PCM)
+        A->>A: Encode PCM → G.722/G.711
+        A->>P: RTP audio packets
+        
+        Note over V: Monitor call progress<br/>& transcript logging
+    end
+    
+    alt Call completed naturally
+        O->>V: Call completion signal
+        V->>S: Send BYE
+    else Duration limit reached
+        V->>V: Safety timeout triggered
+        V->>S: Send BYE
+    end
+    
+    S->>P: BYE (end call)
+    P->>S: 200 OK
+    V->>U: CallResult{transcript, duration, success}
+```
 
 ### Before/After Example
 

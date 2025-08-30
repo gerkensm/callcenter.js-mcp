@@ -27,6 +27,59 @@ if (result.transcript) {
 }
 ```
 
+## API Flow Diagram
+
+```mermaid
+graph TD
+    A[Your Application] -->|makeCall CallOptions| B[VoiceAgent]
+    
+    subgraph "Configuration Resolution"
+        B --> C{Config Source?}
+        C -->|File Path| D[Load config.json]
+        C -->|Config Object| E[Use Provided Config]
+        C -->|None| F[Load from Environment]
+        D --> G[Validated Config]
+        E --> G
+        F --> G
+    end
+    
+    subgraph "Instruction Generation"
+        G --> H{Instructions Method?}
+        H -->|brief provided| I[Brief Processor<br/>o3-mini model]
+        H -->|instructions provided| J[Direct Instructions]
+        H -->|neither| K[Use config defaults]
+        I --> L[Generated Instructions]
+        J --> L
+        K --> L
+    end
+    
+    subgraph "Call Execution"
+        L --> M[Initialize SIP Client]
+        M --> N[Connect to VoIP Network]
+        N --> O[Initialize Audio Bridge]
+        O --> P[Connect to OpenAI Realtime]
+        P --> Q[Execute Call]
+        
+        Q --> R{Call Outcome?}
+        R -->|Success| S[Capture Transcript]
+        R -->|Error| T[Capture Error Details]
+        R -->|Timeout| U[Duration Limit Reached]
+    end
+    
+    subgraph "Result Processing"
+        S --> V[CallResult Success]
+        T --> W[CallResult Error]
+        U --> X[CallResult Timeout]
+        V --> Y[Return to Application]
+        W --> Y
+        X --> Y
+    end
+    
+    style I fill:#e1f5fe
+    style Q fill:#fff3e0
+    style Y fill:#e8f5e8
+```
+
 ## Core API Functions
 
 ### `makeCall(options: CallOptions): Promise<CallResult>`
