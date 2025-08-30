@@ -676,7 +676,18 @@ export class AudioBridge extends EventEmitter {
     // Set up a safety timeout to prevent hanging calls
     const timeoutMs = 10000; // 10 second timeout
     const safetyTimeout = setTimeout(() => {
-      getLogger().audio.warn(`Safety timeout triggered for response ${responseId} - executing callback anyway`, "AUDIO");
+      // Determine if this is an expected case (no audio queued) or anomalous (audio queued but never completed)
+      const tr = this.responseAudioTracking.get(responseId);
+      const queued = tr?.packetsQueued ?? 0;
+      const sent = tr?.packetsSent ?? 0;
+      const msg = `Safety timeout triggered for response ${responseId} - executing callback anyway (queued=${queued}, sent=${sent})`;
+      if (queued === 0) {
+        // Normal: text-only / tool-only / zero-audio response
+        getLogger().audio.info(msg, "AUDIO");
+      } else {
+        // Potentially anomalous: audio was expected but didn't complete
+        getLogger().audio.warn(msg, "AUDIO");
+      }
       this.responseAudioTracking.delete(responseId);
       callback();
     }, timeoutMs);
