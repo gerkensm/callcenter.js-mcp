@@ -40,13 +40,29 @@ export class CallBriefProcessor {
       }
 
       const contextualizedBrief = `${briefText}. You are calling on behalf of ${finalUserName}.`;
+      
+      const now = new Date();
+      const currentDateTime = now.toLocaleString('en-US', {
+        weekday: 'long',
+        year: 'numeric', 
+        month: 'long',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZoneName: 'short'
+      });
+      
+      const metaPromptWithDateTime = META_PROMPT.replace(
+        '[Insert current date and time when generating the prompt]',
+        currentDateTime
+      );
 
       const response = await this.openai.chat.completions.create({
         model: "o3-mini",
         messages: [
           {
             role: "system",
-            content: META_PROMPT,
+            content: metaPromptWithDateTime,
           },
           {
             role: "user",
@@ -67,9 +83,9 @@ export class CallBriefProcessor {
       getLogger().ai.verbose(
         `Generated instructions (${instructions.length} characters):`
       );
-      getLogger().ai.verbose("─".repeat(60));
-      getLogger().ai.verbose(instructions);
-      getLogger().ai.verbose("─".repeat(60));
+      getLogger().ai.info("─".repeat(60));
+      instructions.split("\n").map(line => getLogger().ai.info(line));
+      getLogger().ai.info("─".repeat(60));
 
       return instructions;
     } catch (error) {

@@ -342,7 +342,7 @@ export class OpenAIClient extends EventEmitter {
     if (this.isConnected) return;
 
     try {
-      const url = "wss://api.openai.com/v1/realtime?model=model=gpt-realtime";
+      const url = "wss://api.openai.com/v1/realtime?model=gpt-realtime";
       
       // Create WebSocket with proper authentication headers
       this.ws = new WebSocket(url, [], {
@@ -385,7 +385,7 @@ export class OpenAIClient extends EventEmitter {
     this.send('session.update', {
       session: {
         instructions: this.config.instructions,
-        voice: this.config.voice || "marlin",
+        voice: this.config.voice || "marin",
         turn_detection: { type: "server_vad" },
         input_audio_transcription: { model: "whisper-1" },
         modalities: ["text", "audio"],
