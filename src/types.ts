@@ -110,6 +110,7 @@ export interface AIVoiceConfig {
   instructions?: string;
   brief?: string;
   userName?: string;
+  language?: string; // ISO-639-1 language code for transcription
 }
 
 export interface Config {

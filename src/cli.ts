@@ -73,6 +73,7 @@ program
 
       // Process instructions: CLI instructions > CLI brief > config instructions > config brief
       let finalInstructions: string | undefined;
+      let detectedLanguage: string | undefined;
       
       if (options.instructions) {
         // Direct instructions provided via CLI (highest priority)
@@ -84,10 +85,17 @@ program
         try {
           const processor = new CallBriefProcessor({
             openaiApiKey: config.ai?.openaiApiKey || (config as any).openai?.apiKey || process.env.OPENAI_API_KEY || '',
-            defaultUserName: options.userName || process.env.USER_NAME || config.ai?.userName
+            defaultUserName: options.userName || process.env.USER_NAME || config.ai?.userName,
+            voice: options.voice || config.ai?.voice || (config as any).openai?.voice
           });
           
-          finalInstructions = await processor.generateInstructions(options.brief, options.userName || process.env.USER_NAME || config.ai?.userName);
+          const result = await processor.generateInstructions(
+            options.brief, 
+            options.userName || process.env.USER_NAME || config.ai?.userName,
+            options.voice || config.ai?.voice || (config as any).openai?.voice
+          );
+          finalInstructions = result.instructions;
+          detectedLanguage = result.language;
           logger.info('Successfully generated instructions from CLI call brief', "AI");
         } catch (error) {
           if (error instanceof CallBriefError) {
@@ -107,11 +115,18 @@ program
         try {
           const processor = new CallBriefProcessor({
             openaiApiKey: config.ai?.openaiApiKey || (config as any).openai?.apiKey || process.env.OPENAI_API_KEY || '',
-            defaultUserName: options.userName || process.env.USER_NAME || config.ai?.userName
+            defaultUserName: options.userName || process.env.USER_NAME || config.ai?.userName,
+            voice: options.voice || config.ai?.voice || (config as any).openai?.voice
           });
           
           const configBrief = config.ai?.brief || (config as any).openai?.brief || '';
-          finalInstructions = await processor.generateInstructions(configBrief, options.userName || process.env.USER_NAME || config.ai?.userName);
+          const result = await processor.generateInstructions(
+            configBrief, 
+            options.userName || process.env.USER_NAME || config.ai?.userName,
+            options.voice || config.ai?.voice || (config as any).openai?.voice
+          );
+          finalInstructions = result.instructions;
+          detectedLanguage = result.language;
           logger.info('Successfully generated instructions from config call brief', "AI");
         } catch (error) {
           if (error instanceof CallBriefError) {
@@ -127,11 +142,19 @@ program
         process.exit(1);
       }
 
-      // Update config with final instructions
+      // Update config with final instructions and language
       if (config.ai) {
         config.ai.instructions = finalInstructions;
+        if (detectedLanguage) {
+          config.ai.language = detectedLanguage;
+          logger.info(`Detected language for transcription: ${detectedLanguage}`, "AI");
+        }
       } else if ((config as any).openai) {
         (config as any).openai.instructions = finalInstructions;
+        if (detectedLanguage) {
+          (config as any).openai.language = detectedLanguage;
+          logger.info(`Detected language for transcription: ${detectedLanguage}`, "AI");
+        }
       }
 
       const agent = new VoiceAgent(config, { 

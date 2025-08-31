@@ -134,6 +134,8 @@ Your MCP Client will automatically handle the entire conversation using the AI V
 
 - 🎙️ **Multiple Codec Support**: G.722 wideband (16kHz) + G.711 fallback for broad compatibility
 - 🤖 **AI-Powered Conversations**: Uses OpenAI's Real-Time Voice API with the latest `gpt-realtime` model (released August 28, 2025) for actual calls, with o3-mini model for instruction generation
+- 🌍 **Automatic Language Detection**: Intelligently detects conversation language from call briefs and configures transcription accordingly
+- 🎭 **Voice Characteristics**: Full support for all OpenAI voices with gender and personality awareness
 - 🌐 **Expanded SIP Support**: Configurations for common SIP providers (Fritz!Box tested, others experimental)
 - 🔧 **Smart Configuration**: Auto-detects provider requirements and optimizes settings
 - 📞 **Enterprise-Ready**: Supports advanced SIP features (STUN/TURN, session timers, transport fallback)
@@ -142,7 +144,7 @@ Your MCP Client will automatically handle the entire conversation using the AI V
 - 🎯 **Provider Profiles**: Pre-configured settings for popular SIP systems
 - 🔌 **MCP Server**: Integrate with MCP clients like Claude Code
 - 📚 **TypeScript API**: Programmatic library for building voice applications
-- 📝 **Call Brief Processing**: Natural language call instructions using o3-mini model
+- 📝 **Call Brief Processing**: Natural language call instructions using o3-mini model with structured JSON output
 - 🎵 **Optional Call Recording**: Stereo WAV recording with caller/AI separation
 
 ## 🚀 Quick Start

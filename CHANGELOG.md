@@ -5,7 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2025-08-30
+## [Unreleased] - 2025-08-31
+
+### Added
+- **Automatic Language Detection**: o3-mini intelligently detects conversation language from call briefs and configures OpenAI transcription accordingly
+- **Voice Characteristics Support**: Comprehensive lookup table for all OpenAI voices including gender and personality traits
+- **Structured Output Integration**: Uses OpenAI's JSON schema for reliable, type-safe response parsing from o3-mini
+- **Enhanced Token Limits**: Increased max_completion_tokens to 16,000 for comprehensive multilingual instructions
 
 ### Fixed
 - **Deterministic Call Termination**: Replaced arbitrary safety timeouts with progress-based audio completion monitoring
@@ -21,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **WAV Recording Precision**: Accurate real-time stereo recording reflecting actual call audio timeline
 - **Audio Processing Performance**: Optimized streaming latency for improved OpenAI voice recognition
 - **Logging Quality**: Cleaner logs with warnings only for genuine issues, not normal operational conditions
+- **Multilingual Support**: Instructions and prompts now properly localized based on detected language
 
 ### Technical Enhancements
 - **Progress-based Monitoring**: Track packet sending progress with stall detection (4s threshold)
@@ -29,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Playback Position APIs**: Added methods to query current response playback status
 - **Enhanced Meta-prompts**: Updated with OpenAI Realtime API best practices and goal optimization
 - **Model Compatibility**: Full compatibility with latest `gpt-realtime` model (released August 28, 2025)
+- **Voice Metadata**: Voice selection now includes gender and description context for better prompt generation
 
 ## [1.1.0] - 2025-08-28
 

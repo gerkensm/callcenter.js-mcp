@@ -1,10 +1,17 @@
 import OpenAI from "openai";
 import { META_PROMPT } from "./meta-prompt.js";
 import { getLogger } from "./logger.js";
+import { getVoiceCharacteristics, getVoiceDescription } from "./voice-characteristics.js";
 
 export interface CallBriefProcessorConfig {
   openaiApiKey: string;
   defaultUserName?: string;
+  voice?: string; // Voice being used for the call
+}
+
+export interface GeneratedInstructions {
+  instructions: string;
+  language: string; // ISO-639-1 language code
 }
 
 export class CallBriefProcessor {
@@ -20,11 +27,13 @@ export class CallBriefProcessor {
 
   /**
    * Generate voice agent instructions from a call brief using o3 model
+   * Returns both the instructions and the detected language
    */
   async generateInstructions(
     briefText: string,
-    userName?: string
-  ): Promise<string> {
+    userName?: string,
+    voice?: string
+  ): Promise<GeneratedInstructions> {
     try {
       getLogger().ai.debug(
         "Processing call brief with o3-mini model..."
@@ -52,7 +61,23 @@ export class CallBriefProcessor {
         timeZoneName: 'short'
       });
       
-      const metaPromptWithDateTime = META_PROMPT.replace(
+      let metaPromptWithContext = META_PROMPT;
+      
+      // Add voice context if voice is provided
+      if (voice) {
+        const voiceChar = getVoiceCharacteristics(voice);
+        if (voiceChar) {
+          const voiceContext = `
+Voice Context: The AI agent is using the "${voice}" voice, which is ${voiceChar.description}. The voice has ${voiceChar.gender} characteristics. When referring to itself, the agent should use appropriate pronouns (${voiceChar.gender === 'male' ? 'he/him' : voiceChar.gender === 'female' ? 'she/her' : 'they/them'}) if gender references are needed, though it's better to avoid gendered self-references when possible.\n`;
+          metaPromptWithContext = metaPromptWithContext.replace('[VOICE_CONTEXT]', voiceContext);
+        } else {
+          metaPromptWithContext = metaPromptWithContext.replace('[VOICE_CONTEXT]', '');
+        }
+      } else {
+        metaPromptWithContext = metaPromptWithContext.replace('[VOICE_CONTEXT]', '');
+      }
+      
+      const metaPromptWithDateTime = metaPromptWithContext.replace(
         '[Insert current date and time when generating the prompt]',
         currentDateTime
       );
@@ -69,17 +94,58 @@ export class CallBriefProcessor {
             content: `Call Brief: ${contextualizedBrief}`,
           },
         ],
-        max_completion_tokens: 5000,
+        max_completion_tokens: 16000,
         reasoning_effort: "medium",
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "voice_agent_response",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                language: {
+                  type: "string",
+                  description: "ISO-639-1 language code for the conversation (e.g., 'en', 'es', 'fr', 'de', 'it', 'pt', 'nl', 'ru', 'zh', 'ja', 'ko')"
+                },
+                instructions: {
+                  type: "string",
+                  description: "The complete voice agent instructions with all sections as specified in the prompt"
+                }
+              },
+              required: ["language", "instructions"],
+              additionalProperties: false
+            }
+          }
+        }
       });
 
-      const instructions = response.choices[0]?.message?.content?.trim();
+      const content = response.choices[0]?.message?.content?.trim();
 
-      if (!instructions) {
-        throw new Error("No instructions generated from call brief");
+      if (!content) {
+        throw new Error("No response generated from call brief");
       }
 
-      getLogger().ai.info("Successfully generated voice agent instructions");
+      // Parse the structured JSON response
+      let parsedResponse: { language: string; instructions: string };
+      try {
+        parsedResponse = JSON.parse(content);
+      } catch (e) {
+        getLogger().ai.error('Failed to parse structured response:', e);
+        throw new Error(`Invalid JSON response from o3-mini: ${e}`);
+      }
+
+      const { language, instructions } = parsedResponse;
+
+      if (!instructions) {
+        throw new Error("No instructions in structured response");
+      }
+      
+      if (!language) {
+        throw new Error("No language code in structured response");
+      }
+
+      getLogger().ai.info(`Successfully generated voice agent instructions (language: ${language})`);
       getLogger().ai.verbose(
         `Generated instructions (${instructions.length} characters):`
       );
@@ -87,7 +153,7 @@ export class CallBriefProcessor {
       instructions.split("\n").map(line => getLogger().ai.info(line));
       getLogger().ai.info("─".repeat(60));
 
-      return instructions;
+      return { instructions, language };
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";

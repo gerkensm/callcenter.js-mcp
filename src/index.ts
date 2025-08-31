@@ -133,6 +133,7 @@ export async function makeCall(options: CallOptions): Promise<CallResult> {
 
     // Process instructions: options.instructions > options.brief > config instructions > config brief
     let finalInstructions: string | undefined;
+    let detectedLanguage: string | undefined;
     
     if (options.instructions) {
       finalInstructions = options.instructions;
@@ -142,10 +143,17 @@ export async function makeCall(options: CallOptions): Promise<CallResult> {
       try {
         const processor = new CallBriefProcessor({
           openaiApiKey: config.ai?.openaiApiKey || (config as any).openai?.apiKey || process.env.OPENAI_API_KEY || '',
-          defaultUserName: options.userName
+          defaultUserName: options.userName,
+          voice: config.ai?.voice || (config as any).openai?.voice
         });
         
-        finalInstructions = await processor.generateInstructions(options.brief, options.userName);
+        const result = await processor.generateInstructions(
+          options.brief, 
+          options.userName,
+          config.ai?.voice || (config as any).openai?.voice
+        );
+        finalInstructions = result.instructions;
+        detectedLanguage = result.language;
         logger.info('Successfully generated instructions from call brief', 'AI');
       } catch (error) {
         if (error instanceof CallBriefError) {
@@ -162,11 +170,18 @@ export async function makeCall(options: CallOptions): Promise<CallResult> {
       try {
         const processor = new CallBriefProcessor({
           openaiApiKey: config.ai?.openaiApiKey || (config as any).openai?.apiKey || process.env.OPENAI_API_KEY || '',
-          defaultUserName: options.userName
+          defaultUserName: options.userName,
+          voice: config.ai?.voice || (config as any).openai?.voice
         });
         
         const configBrief = config.ai?.brief || (config as any).openai?.brief || '';
-        finalInstructions = await processor.generateInstructions(configBrief, options.userName);
+        const result = await processor.generateInstructions(
+          configBrief, 
+          options.userName,
+          config.ai?.voice || (config as any).openai?.voice
+        );
+        finalInstructions = result.instructions;
+        detectedLanguage = result.language;
         logger.info('Successfully generated instructions from config call brief', 'AI');
       } catch (error) {
         if (error instanceof CallBriefError) {
@@ -179,11 +194,19 @@ export async function makeCall(options: CallOptions): Promise<CallResult> {
       throw new Error('No instructions or brief provided. Provide instructions, brief, or set them in config file.');
     }
 
-    // Update config with final instructions
+    // Update config with final instructions and language
     if (config.ai) {
       config.ai.instructions = finalInstructions;
+      if (detectedLanguage) {
+        config.ai.language = detectedLanguage;
+        logger.info(`Detected language for transcription: ${detectedLanguage}`, "AI");
+      }
     } else if ((config as any).openai) {
       (config as any).openai.instructions = finalInstructions;
+      if (detectedLanguage) {
+        (config as any).openai.language = detectedLanguage;
+        logger.info(`Detected language for transcription: ${detectedLanguage}`, "AI");
+      }
     }
 
     // Create and initialize voice agent

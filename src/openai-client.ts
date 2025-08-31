@@ -916,7 +916,10 @@ export class OpenAIClient extends EventEmitter {
         instructions: this.config.instructions,
         voice: this.config.voice || "marin",
         turn_detection: { type: "server_vad" },
-        input_audio_transcription: { model: "whisper-1" },
+        input_audio_transcription: { 
+          model: "whisper-1",
+          language: this.config.language // ISO-639-1 code, if provided
+        },
         modalities: ["text", "audio"],
         input_audio_format: "pcm16",
         output_audio_format: "pcm16",
