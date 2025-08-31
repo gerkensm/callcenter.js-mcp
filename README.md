@@ -850,16 +850,16 @@ The AI agent supports 10 different voices from OpenAI's Realtime API, each with 
 
 | Voice | Gender | Description | Best For |
 |-------|--------|-------------|----------|
-| **marin** | Female | Clear, professional feminine voice | Customer support, appointments, general assistance |
-| **cedar** | Male | Natural masculine voice with warm undertones | Advisory roles, serious matters, enterprise contexts |
-| **alloy** | Neutral | Professional voice with good adaptability | Technical support, neutral business contexts |
-| **echo** | Male | Conversational masculine voice | Casual interactions, friendly service |
-| **shimmer** | Female | Warm, expressive feminine voice | Healthcare, empathetic conversations |
-| **coral** | Female | Warm and friendly feminine voice | Retail, customer service |
-| **sage** | Neutral | Calm and thoughtful voice | Healthcare, counseling, professional advice |
-| **ash** | Neutral | Clear and precise voice | Technical explanations, instructions |
-| **ballad** | Female | Melodic and smooth feminine voice | Education, storytelling |
-| **verse** | Neutral | Versatile and expressive voice | Dynamic conversations, varied contexts |
+| **marin** | Female | Clear, professional feminine voice | All-purpose: business calls, customer support, negotiations |
+| **cedar** | Male | Natural masculine voice with warm undertones | All-purpose: professional calls, consultations, service interactions |
+| **alloy** | Neutral | Professional voice with good adaptability | Technical discussions, business contexts, general inquiries |
+| **echo** | Male | Conversational masculine voice | Casual to formal interactions, versatile tone |
+| **shimmer** | Female | Warm, expressive feminine voice | Empathetic conversations, sales, professional contexts |
+| **coral** | Female | Warm and friendly feminine voice | Customer interactions, consultations, support calls |
+| **sage** | Neutral | Calm and thoughtful voice | Medical consultations, advisory roles, serious discussions |
+| **ash** | Neutral | Clear and precise voice | Technical explanations, instructions, educational content |
+| **ballad** | Female | Melodic and smooth feminine voice | Presentations, storytelling, engaging conversations |
+| **verse** | Neutral | Versatile and expressive voice | Dynamic conversations, adaptable to any context |
 
 ### Auto Voice Selection (Recommended)
 

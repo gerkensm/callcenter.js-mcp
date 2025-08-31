@@ -9,8 +9,8 @@ export const VOICE_SELECTION_COMPACT = `
 Choose the most appropriate voice based on these criteria:
 
 ### Primary Recommendations (Newest, Most Versatile)
-- **marin**: Modern professional feminine voice. Best for: customer support, appointments, general assistance. Clear and approachable.
-- **cedar**: Calm professional masculine voice. Best for: advisory roles, serious matters, enterprise contexts. Trustworthy and grounded.
+- **marin**: Modern professional feminine voice. All-purpose voice excellent for business calls, negotiations, customer support, and executive contexts. Clear and adaptable.
+- **cedar**: Calm professional masculine voice. All-purpose voice suitable for consultations, service calls, professional discussions, and friendly interactions. Warm and trustworthy.
 
 ### Quick Selection Rules
 **By Context:**
@@ -20,11 +20,11 @@ Choose the most appropriate voice based on these criteria:
 - Upbeat + Energetic → echo, verse
 
 **By Industry:**
-- Healthcare/Wellness → shimmer, sage (calming)
-- Finance/Legal → cedar, sage (authoritative)
-- Retail/Support → marin, coral (friendly)
-- Tech/Developer → alloy, ash (precise)
-- Education → ballad, echo (engaging)
+- Healthcare/Wellness → sage, shimmer, marin (calming and professional)
+- Finance/Legal → any voice depending on tone needed (all are professional)
+- Retail/Support → coral, marin, cedar (friendly and helpful)
+- Tech/Developer → alloy, ash, echo (clear and precise)
+- Education → ballad, verse, sage (engaging and clear)
 
 **By Formality:**
 - High: cedar, marin, sage
