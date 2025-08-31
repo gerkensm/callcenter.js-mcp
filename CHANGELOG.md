@@ -10,8 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Automatic Language Detection**: o3-mini intelligently detects conversation language from call briefs and configures OpenAI transcription accordingly
 - **Voice Characteristics Support**: Comprehensive lookup table for all OpenAI voices including gender and personality traits
+- **Auto Voice Selection**: New 'auto' mode where o3-mini selects optimal voice based on call context, formality, and goals
 - **Structured Output Integration**: Uses OpenAI's JSON schema for reliable, type-safe response parsing from o3-mini
 - **Enhanced Token Limits**: Increased max_completion_tokens to 16,000 for comprehensive multilingual instructions
+- **Voice Validation**: Robust validation and sanitization for voice names with fallback handling
 
 ### Fixed
 - **Deterministic Call Termination**: Replaced arbitrary safety timeouts with progress-based audio completion monitoring

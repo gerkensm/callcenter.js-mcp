@@ -8,6 +8,7 @@ import { Config } from './types.js';
 import { initializeLogger, LogLevel } from './logger.js';
 import { CallBriefProcessor, CallBriefError } from './call-brief-processor.js';
 import { isValidLanguageCode } from './language-utils.js';
+import { sanitizeVoiceName } from './voice-characteristics.js';
 import * as path from 'path';
 
 const program = new Command();
@@ -33,6 +34,7 @@ program
   .option('--brief <text>', 'Call brief to generate instructions from (e.g., "Call Bocca di Bacco and book a table for 2 at 19:30 for Torben")')
   .option('--instructions <text>', 'Direct instructions for the AI agent (overrides config and brief)')
   .option('--user-name <name>', 'Your name for the AI to use when calling on your behalf')
+  .option('--voice <name>', 'Voice to use (auto, alloy, echo, nova, etc.). Default: auto')
   .action(async (number: string, options: any) => {
     try {
       // Determine log level from options (default to info mode)
@@ -75,6 +77,18 @@ program
       // Process instructions: CLI instructions > CLI brief > config instructions > config brief
       let finalInstructions: string | undefined;
       let detectedLanguage: string | undefined;
+      let selectedVoice: string | undefined;
+      
+      // Validate and sanitize voice option
+      const requestedVoice = options.voice || config.ai?.voice || (config as any).openai?.voice || 'auto';
+      const validatedVoice = sanitizeVoiceName(requestedVoice);
+      
+      if (!validatedVoice) {
+        logger.warn(`Invalid voice '${requestedVoice}', defaulting to auto selection`, "CONFIG");
+      }
+      
+      const voiceToUse = validatedVoice || 'auto';
+      logger.info(`Using voice mode: ${voiceToUse}`, "CONFIG");
       
       if (options.instructions) {
         // Direct instructions provided via CLI (highest priority)
@@ -87,16 +101,17 @@ program
           const processor = new CallBriefProcessor({
             openaiApiKey: config.ai?.openaiApiKey || (config as any).openai?.apiKey || process.env.OPENAI_API_KEY || '',
             defaultUserName: options.userName || process.env.USER_NAME || config.ai?.userName,
-            voice: options.voice || config.ai?.voice || (config as any).openai?.voice
+            voice: voiceToUse
           });
           
           const result = await processor.generateInstructions(
             options.brief, 
             options.userName || process.env.USER_NAME || config.ai?.userName,
-            options.voice || config.ai?.voice || (config as any).openai?.voice
+            voiceToUse
           );
           finalInstructions = result.instructions;
           detectedLanguage = result.language;
+          selectedVoice = result.selectedVoice;
           logger.info('Successfully generated instructions from CLI call brief', "AI");
         } catch (error) {
           if (error instanceof CallBriefError) {
@@ -117,17 +132,18 @@ program
           const processor = new CallBriefProcessor({
             openaiApiKey: config.ai?.openaiApiKey || (config as any).openai?.apiKey || process.env.OPENAI_API_KEY || '',
             defaultUserName: options.userName || process.env.USER_NAME || config.ai?.userName,
-            voice: options.voice || config.ai?.voice || (config as any).openai?.voice
+            voice: voiceToUse
           });
           
           const configBrief = config.ai?.brief || (config as any).openai?.brief || '';
           const result = await processor.generateInstructions(
             configBrief, 
             options.userName || process.env.USER_NAME || config.ai?.userName,
-            options.voice || config.ai?.voice || (config as any).openai?.voice
+            voiceToUse
           );
           finalInstructions = result.instructions;
           detectedLanguage = result.language;
+          selectedVoice = result.selectedVoice;
           logger.info('Successfully generated instructions from config call brief', "AI");
         } catch (error) {
           if (error instanceof CallBriefError) {
@@ -143,22 +159,32 @@ program
         process.exit(1);
       }
 
-      // Update config with final instructions and language
+      // Update config with final instructions, language, and voice
+      const finalVoice = selectedVoice || (voiceToUse !== 'auto' ? voiceToUse : 'marin');
+      
       if (config.ai) {
         config.ai.instructions = finalInstructions;
+        config.ai.voice = finalVoice;
         if (detectedLanguage && isValidLanguageCode(detectedLanguage)) {
           config.ai.language = detectedLanguage;
           logger.info(`Detected language for transcription: ${detectedLanguage}`, "AI");
         } else if (detectedLanguage) {
           logger.warn(`Invalid detected language '${detectedLanguage}' - Whisper will auto-detect`, "AI");
         }
+        if (selectedVoice) {
+          logger.info(`Auto-selected voice: ${selectedVoice}`, "AI");
+        }
       } else if ((config as any).openai) {
         (config as any).openai.instructions = finalInstructions;
+        (config as any).openai.voice = finalVoice;
         if (detectedLanguage && isValidLanguageCode(detectedLanguage)) {
           (config as any).openai.language = detectedLanguage;
           logger.info(`Detected language for transcription: ${detectedLanguage}`, "AI");
         } else if (detectedLanguage) {
           logger.warn(`Invalid detected language '${detectedLanguage}' - Whisper will auto-detect`, "AI");
+        }
+        if (selectedVoice) {
+          logger.info(`Auto-selected voice: ${selectedVoice}`, "AI");
         }
       }
 

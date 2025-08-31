@@ -16,9 +16,10 @@ A terse description like: "Call {target_name} at {target_phone} to {goal}. Optio
 Assume any field may be missing. Treat numbers, names, spellings, codes, emails, dates and times as critical data.
 
 **Your job**
-Generate a JSON response with two fields:
+Generate a JSON response with these fields:
 1. "language": The ISO-639-1 language code for the conversation (e.g., 'en', 'es', 'fr', 'de', 'it', 'pt', 'nl', 'ru', 'zh', 'ja', 'ko'). Infer this from the brief content and context.
 2. "instructions": The complete voice agent prompt with these exact sections in order (TRANSLATE ALL SECTION HEADINGS if target language is not English):
+3. "selectedVoice" (only when voice selection context is provided): Choose the most appropriate voice based on the context, formality, language, and goal. Consider the voice descriptions and guidelines provided.
 
 # Role & Objective
 Define who the agent is and what success means. Format:

@@ -202,10 +202,45 @@ export const VOICE_CHARACTERISTICS: Record<string, VoiceCharacteristics> = {
 };
 
 /**
+ * List of all valid voice names
+ */
+export const VALID_VOICE_NAMES = Object.keys(VOICE_CHARACTERISTICS);
+
+/**
  * Get voice characteristics for a given voice name
  */
 export function getVoiceCharacteristics(voiceName: string): VoiceCharacteristics | undefined {
   return VOICE_CHARACTERISTICS[voiceName.toLowerCase()];
+}
+
+/**
+ * Check if a voice name is valid
+ */
+export function isValidVoiceName(voiceName: string | undefined): boolean {
+  if (!voiceName) return false;
+  return voiceName.toLowerCase() === 'auto' || VOICE_CHARACTERISTICS.hasOwnProperty(voiceName.toLowerCase());
+}
+
+/**
+ * Validate and sanitize a voice name
+ * Returns 'auto' for auto mode, validated voice name, or undefined for invalid
+ */
+export function sanitizeVoiceName(voiceName: string | undefined): string | undefined {
+  if (!voiceName) return undefined;
+  
+  const normalized = voiceName.toLowerCase().trim();
+  
+  // Handle auto mode
+  if (normalized === 'auto' || normalized === 'automatic') {
+    return 'auto';
+  }
+  
+  // Check if it's a valid voice
+  if (VOICE_CHARACTERISTICS.hasOwnProperty(normalized)) {
+    return normalized;
+  }
+  
+  return undefined;
 }
 
 /**

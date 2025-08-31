@@ -1,8 +1,9 @@
 import OpenAI from "openai";
 import { META_PROMPT } from "./meta-prompt.js";
 import { getLogger } from "./logger.js";
-import { getVoiceCharacteristics, getVoiceDescription } from "./voice-characteristics.js";
+import { getVoiceCharacteristics, getVoiceDescription, VALID_VOICE_NAMES } from "./voice-characteristics.js";
 import { sanitizeLanguageCode } from "./language-utils.js";
+import { VOICE_SELECTION_COMPACT, VOICE_SELECTION_INSTRUCTION } from "./voice-selection-compact.js";
 
 export interface CallBriefProcessorConfig {
   openaiApiKey: string;
@@ -13,6 +14,7 @@ export interface CallBriefProcessorConfig {
 export interface GeneratedInstructions {
   instructions: string;
   language: string; // ISO-639-1 language code
+  selectedVoice?: string; // Voice selected by o3-mini when in auto mode
 }
 
 export class CallBriefProcessor {
@@ -64,8 +66,15 @@ export class CallBriefProcessor {
       
       let metaPromptWithContext = META_PROMPT;
       
-      // Add voice context if voice is provided
-      if (voice) {
+      // Add voice context based on mode
+      if (voice === 'auto') {
+        const autoVoiceContext = `
+${VOICE_SELECTION_COMPACT}
+
+${VOICE_SELECTION_INSTRUCTION}
+`;
+        metaPromptWithContext = metaPromptWithContext.replace('[VOICE_CONTEXT]', autoVoiceContext);
+      } else if (voice) {
         const voiceChar = getVoiceCharacteristics(voice);
         if (voiceChar) {
           const voiceContext = `
@@ -82,6 +91,30 @@ Voice Context: The AI agent is using the "${voice}" voice, which is ${voiceChar.
         '[Insert current date and time when generating the prompt]',
         currentDateTime
       );
+
+      // Build schema based on whether we need voice selection
+      const schemaProperties: any = {
+        language: {
+          type: "string",
+          description: "ISO-639-1 language code for the conversation (e.g., 'en', 'es', 'fr', 'de', 'it', 'pt', 'nl', 'ru', 'zh', 'ja', 'ko')"
+        },
+        instructions: {
+          type: "string",
+          description: "The complete voice agent instructions with all sections as specified in the prompt"
+        }
+      };
+      
+      const requiredFields = ["language", "instructions"];
+      
+      // Add voice selection to schema if in auto mode
+      if (voice === 'auto') {
+        schemaProperties.selectedVoice = {
+          type: "string",
+          description: "The most appropriate voice for this call based on context, formality, and goal",
+          enum: VALID_VOICE_NAMES
+        };
+        requiredFields.push("selectedVoice");
+      }
 
       const response = await this.openai.chat.completions.create({
         model: "o3-mini",
@@ -104,17 +137,8 @@ Voice Context: The AI agent is using the "${voice}" voice, which is ${voiceChar.
             strict: true,
             schema: {
               type: "object",
-              properties: {
-                language: {
-                  type: "string",
-                  description: "ISO-639-1 language code for the conversation (e.g., 'en', 'es', 'fr', 'de', 'it', 'pt', 'nl', 'ru', 'zh', 'ja', 'ko')"
-                },
-                instructions: {
-                  type: "string",
-                  description: "The complete voice agent instructions with all sections as specified in the prompt"
-                }
-              },
-              required: ["language", "instructions"],
+              properties: schemaProperties,
+              required: requiredFields,
               additionalProperties: false
             }
           }
@@ -128,7 +152,7 @@ Voice Context: The AI agent is using the "${voice}" voice, which is ${voiceChar.
       }
 
       // Parse the structured JSON response
-      let parsedResponse: { language: string; instructions: string };
+      let parsedResponse: { language: string; instructions: string; selectedVoice?: string };
       try {
         parsedResponse = JSON.parse(content);
       } catch (e) {
@@ -136,7 +160,7 @@ Voice Context: The AI agent is using the "${voice}" voice, which is ${voiceChar.
         throw new Error(`Invalid JSON response from o3-mini: ${e}`);
       }
 
-      const { language: rawLanguage, instructions } = parsedResponse;
+      const { language: rawLanguage, instructions, selectedVoice } = parsedResponse;
 
       if (!instructions) {
         throw new Error("No instructions in structured response");
@@ -153,7 +177,7 @@ Voice Context: The AI agent is using the "${voice}" voice, which is ${voiceChar.
         getLogger().ai.info(`Normalized language code from '${rawLanguage}' to '${language}'`);
       }
 
-      getLogger().ai.info(`Successfully generated voice agent instructions (language: ${language})`);
+      getLogger().ai.info(`Successfully generated voice agent instructions (language: ${language}${selectedVoice ? `, voice: ${selectedVoice}` : ''})`);
       getLogger().ai.verbose(
         `Generated instructions (${instructions.length} characters):`
       );
@@ -161,7 +185,7 @@ Voice Context: The AI agent is using the "${voice}" voice, which is ${voiceChar.
       instructions.split("\n").map(line => getLogger().ai.info(line));
       getLogger().ai.info("─".repeat(60));
 
-      return { instructions, language };
+      return { instructions, language, selectedVoice };
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unknown error";

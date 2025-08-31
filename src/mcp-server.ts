@@ -53,6 +53,12 @@ const SIMPLE_CALL_TOOL = {
         type: "boolean",
         description: "Whether to record the call for later review. Recorded files are saved with timestamp.",
         default: false
+      },
+      voice: {
+        type: "string",
+        description: "Voice selection (optional, recommended: 'auto'). When set to 'auto', the AI analyzes the call context and selects the optimal voice for success. Manual options: marin (professional feminine), cedar (calm masculine), alloy (neutral tech), echo (conversational), shimmer (warm), nova (energetic), onyx (authoritative), and others. Using 'auto' typically yields better results as it matches voice to context.",
+        enum: ["auto", "alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse", "arbor", "breeze", "cedar", "cove", "ember", "juniper", "maple", "marin", "sol", "spruce", "vale"],
+        default: "auto"
       }
     },
     required: ["phone_number", "brief", "caller_name"],
@@ -173,6 +179,14 @@ const ADVANCED_CALL_TOOL = {
         enum: ["low", "medium", "high"],
         description: "Required formality level: 'low' (casual, friendly), 'medium' (professional), 'high' (very formal, corporate)",
         default: "medium"
+      },
+      
+      // Voice selection
+      voice: {
+        type: "string",
+        description: "Voice selection (strongly recommended: 'auto'). In 'auto' mode, AI intelligently selects the optimal voice based on formality, goal, industry, and language. Manual selection available but 'auto' typically achieves better results. Voice categories - PROFESSIONAL: marin/cedar/alloy, FRIENDLY: coral/echo/shimmer, AUTHORITATIVE: onyx/sage, ENERGETIC: nova/ember/vale, CALM: spruce/fable. Most users should use 'auto'.",
+        enum: ["auto", "alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse", "arbor", "breeze", "cedar", "cove", "ember", "juniper", "maple", "marin", "sol", "spruce", "vale"],
+        default: "auto"
       },
       
       // Configuration and call settings
@@ -411,7 +425,7 @@ class MCPServer {
   }
 
   private async handleSimpleCall(args: any): Promise<{ content: any[] }> {
-    const { phone_number, brief, caller_name, config_path, duration, recording } = args;
+    const { phone_number, brief, caller_name, config_path, duration, recording, voice } = args;
 
     // Validate required parameters
     if (!phone_number || !brief || !caller_name) {
@@ -439,6 +453,7 @@ class MCPServer {
       config: config_path || 'config.json',
       duration,
       recording,
+      voice: voice || 'auto',
       logLevel: 'quiet'
     };
 
@@ -477,6 +492,7 @@ class MCPServer {
       jurisdiction,
       allow_persuasion_white_lies,
       requires_formality,
+      voice,
       config,
       config_path,
       duration,
@@ -537,6 +553,7 @@ class MCPServer {
       config: config || config_path,
       duration,
       recording: recording_filename ? recording_filename : recording,
+      voice: voice || 'auto',
       logLevel: log_level || 'quiet',
       colors,
       timestamps
