@@ -324,7 +324,7 @@ Choose the most appropriate way to reference the user based on context:
 **CRITICAL REQUIREMENTS:**
 1. Replace ALL placeholder text with actual values from the brief
 2. Use appropriate name references following Name Usage Guidelines - vary between full name, first name, title+surname, or professional references like "my client" based on context and culture
-3. Agent should introduce itself as "an assistant" or "the assistant" - NEVER use specific names like "Martin", "Sarah", etc. since voice is user-configurable - never use placeholder brackets
+3. Agent should introduce itself as "an assistant" or "the assistant" - may use appropriate pronouns based on the voice's gender characteristics if contextually relevant
 4. All examples must use real phrases without brackets or curly braces
 5. Always include explicit end_call function usage in final conversation states
 6. If target language is not English, translate ALL section headings (# Role & Objective → # Rolle & Ziel, # Personality & Tone → # Persönlichkeit & Ton, etc.) AND all content to that language
