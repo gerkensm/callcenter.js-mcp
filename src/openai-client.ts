@@ -28,7 +28,7 @@ export class OpenAIClient extends EventEmitter {
   // Track which responses actually produced audio
   private responseHasAudio: Set<string> = new Set();
   // Track accumulated user transcription from delta events
-  private currentUserTranscript: string = '';
+  private currentUserTranscript: string = "";
   // Queue completed transcripts until audio finishes playing
   private pendingTranscripts: Map<string, string> = new Map();
   // Map item_id to response_id for accurate truncation handling
@@ -55,15 +55,15 @@ export class OpenAIClient extends EventEmitter {
 
   private setupWebSocketHandlers(): void {
     const logger = getLogger();
-    
+
     if (!this.ws) return;
 
     // Handle WebSocket messages (all OpenAI Realtime API events)
-    this.ws.on('message', (message: Buffer) => {
+    this.ws.on("message", (message: Buffer) => {
       try {
         const event = JSON.parse(message.toString());
         const startTime = performance.now();
-        
+
         // Track performance
         const processingTime = performance.now() - startTime;
         this.perfStats.eventProcessTimes.push(processingTime);
@@ -79,15 +79,15 @@ export class OpenAIClient extends EventEmitter {
 
         // Handle different event types
         switch (event.type) {
-          case 'session.created':
-            logger.ai.debug('Session created', "AI");
-            break;
-            
-          case 'session.updated':
-            logger.ai.debug('Session updated', "AI");
+          case "session.created":
+            logger.ai.debug("Session created", "AI");
             break;
 
-          case 'response.audio.delta':
+          case "session.updated":
+            logger.ai.debug("Session updated", "AI");
+            break;
+
+          case "response.audio.delta":
             // Handle audio streaming from OpenAI
             if (event.delta) {
               // Mark that this response produced audio
@@ -102,7 +102,7 @@ export class OpenAIClient extends EventEmitter {
                   tracker.addAudioDelta(event.delta, 24000);
                 }
               }
-              
+
               const audioBuffer = Buffer.from(event.delta, "base64");
               const audioData = new Int16Array(
                 audioBuffer.buffer,
@@ -125,32 +125,49 @@ export class OpenAIClient extends EventEmitter {
                 this.onAudioCallback(audioData, event.response_id);
               }
             } else {
-              logger.ai.warn("response.audio.delta event missing delta:", JSON.stringify(event));
+              logger.ai.warn(
+                "response.audio.delta event missing delta:",
+                JSON.stringify(event)
+              );
             }
             break;
 
-          case 'response.output_item.done':
-            logger.ai.debug(`output_item.done: ${event.item?.type}, name: ${event.item?.name}`, "AI");
-            
+          case "response.output_item.done":
+            logger.ai.debug(
+              `output_item.done: ${event.item?.type}, name: ${event.item?.name}`,
+              "AI"
+            );
+
             // Map item_id to response_id for accurate truncation handling
             if (event.item?.id && event.response_id) {
               this.itemToResponseMap.set(event.item.id, event.response_id);
-              logger.ai.debug(`Mapped item ${event.item.id} to response ${event.response_id}`, "AI");
+              logger.ai.debug(
+                `Mapped item ${event.item.id} to response ${event.response_id}`,
+                "AI"
+              );
             }
-            
+
             // Handle function calls - this is the key event for function execution
-            if (event.item?.type === "function_call" && event.item.name === "end_call") {
-              const args = event.item.arguments ? JSON.parse(event.item.arguments) : {};
+            if (
+              event.item?.type === "function_call" &&
+              event.item.name === "end_call"
+            ) {
+              const args = event.item.arguments
+                ? JSON.parse(event.item.arguments)
+                : {};
               const reason = args?.reason ?? "unknown";
-              
+
               logger.ai.info(`AI decided to end call: ${reason}`, "AI");
-              
+
               // Emit the reason so VoiceAgent can track it
-              this.emit('aiEndCallDecision', reason);
-              
+              this.emit("aiEndCallDecision", reason);
+
               // Set flag to execute end_call after THIS specific response finishes streaming
               this.pendingEndCall = { reason, responseId: event.response_id };
-              logger.ai.debug(`End call queued for response ${event.response_id}`, "AI");
+              logger.ai.debug(
+                `End call queued for response ${event.response_id}`,
+                "AI"
+              );
 
               // Send function call output back
               this.send("conversation.item.create", {
@@ -160,118 +177,151 @@ export class OpenAIClient extends EventEmitter {
                   output: `Call ended successfully. Reason: ${reason}`,
                 },
               });
-              
+
               // Don't send response.create - call should end here
             }
             break;
 
-          case 'response.function_call_arguments.delta':
-            logger.ai.debug(`Function call arguments delta: ${event.name} - ${event.delta}`, "AI");
+          case "response.function_call_arguments.delta":
+            logger.ai.debug(
+              `Function call arguments delta: ${event.name} - ${event.delta}`,
+              "AI"
+            );
             break;
 
-          case 'response.function_call_arguments.done':
-            logger.ai.debug(`Function call arguments done: ${event.name}, call_id: ${event.call_id}, args: ${event.arguments}`, "AI");
+          case "response.function_call_arguments.done":
+            logger.ai.debug(
+              `Function call arguments done: ${event.name}, call_id: ${event.call_id}, args: ${event.arguments}`,
+              "AI"
+            );
             break;
 
-          case 'input_audio_buffer.speech_started':
-            logger.ai.debug("Speech started (user is talking) - interrupting AI");
-            
+          case "input_audio_buffer.speech_started":
+            logger.ai.debug(
+              "Speech started (user is talking) - interrupting AI"
+            );
+
             // Reset user transcript accumulation for new utterance
-            this.currentUserTranscript = '';
-            
+            this.currentUserTranscript = "";
+
             // Track if we're canceling a goodbye
             const wasCancelingGoodbye = !!this.pendingEndCall;
-            
+
             // Only mark the actively playing response as interrupted
             // We need to get this from AudioBridge via VoiceAgent
-            this.emit("getPlayingResponseId", (playingResponseId: string | null) => {
-              if (playingResponseId && this.responseTrackers.has(playingResponseId)) {
-                this.canceledResponses.add(playingResponseId);
-                logger.ai.debug(`Marked actively playing response ${playingResponseId} as interrupted`, "AI");
-                
-                // Find the correct item ID for this response
-                let itemIdForPlaying: string | null = null;
-                for (const [itemId, respId] of this.itemToResponseMap) {
-                  if (respId === playingResponseId) {
-                    itemIdForPlaying = itemId;
-                    break;
-                  }
-                }
-                
-                // Only truncate if we found the correct item
-                if (itemIdForPlaying) {
-                  // Get actual audio playback position from AudioBridge
-                  let audioEndMs = 0;
-                  this.emit("getPlaybackPosition", (position: number) => {
-                    audioEndMs = Math.max(0, position);
-                  });
-                  
-                  // Clamp audioEndMs to avoid "already shorter than" errors
-                  const tracker = this.responseTrackers.get(playingResponseId);
-                  if (tracker) {
-                    const requestedEndMs = audioEndMs; // Save original value for logging
-                    const totalMs = tracker.getTotalAudioDurationMs();
-                    if (totalMs > 0 && audioEndMs > totalMs) {
-                      audioEndMs = totalMs;
-                      logger.ai.debug(`Clamped audioEndMs from ${requestedEndMs}ms to ${totalMs}ms (total audio)`, "AI");
+            this.emit(
+              "getPlayingResponseId",
+              (playingResponseId: string | null) => {
+                if (
+                  playingResponseId &&
+                  this.responseTrackers.has(playingResponseId)
+                ) {
+                  this.canceledResponses.add(playingResponseId);
+                  logger.ai.debug(
+                    `Marked actively playing response ${playingResponseId} as interrupted`,
+                    "AI"
+                  );
+
+                  // Find the correct item ID for this response
+                  let itemIdForPlaying: string | null = null;
+                  for (const [itemId, respId] of this.itemToResponseMap) {
+                    if (respId === playingResponseId) {
+                      itemIdForPlaying = itemId;
+                      break;
                     }
                   }
-                  
-                  logger.ai.debug(`Truncating item ${itemIdForPlaying} at ${audioEndMs}ms`, "AI");
-                  
-                  // Send truncate after getting position, then retrieve after server processing
-                  setTimeout(() => {
-                    this.send("conversation.item.truncate", {
-                      item_id: itemIdForPlaying,
-                      content_index: 0,
-                      audio_end_ms: audioEndMs
+
+                  // Only truncate if we found the correct item
+                  if (itemIdForPlaying) {
+                    // Get actual audio playback position from AudioBridge
+                    let audioEndMs = 0;
+                    this.emit("getPlaybackPosition", (position: number) => {
+                      audioEndMs = Math.max(0, position);
                     });
-                  }, 10);
-                  
-                  // Retrieve the item after truncation processing
-                  setTimeout(() => {
-                    this.send("conversation.item.retrieve", {
-                      item_id: itemIdForPlaying
-                    });
-                  }, 1010);
-                } else {
-                  logger.ai.warn(`Could not find item ID for playing response ${playingResponseId}, skipping truncation`, "AI");
+
+                    // Clamp audioEndMs to avoid "already shorter than" errors
+                    const tracker =
+                      this.responseTrackers.get(playingResponseId);
+                    if (tracker) {
+                      const requestedEndMs = audioEndMs; // Save original value for logging
+                      const totalMs = tracker.getTotalAudioDurationMs();
+                      if (totalMs > 0 && audioEndMs > totalMs) {
+                        audioEndMs = totalMs;
+                        logger.ai.debug(
+                          `Clamped audioEndMs from ${requestedEndMs}ms to ${totalMs}ms (total audio)`,
+                          "AI"
+                        );
+                      }
+                    }
+
+                    logger.ai.debug(
+                      `Truncating item ${itemIdForPlaying} at ${audioEndMs}ms`,
+                      "AI"
+                    );
+
+                    // Send truncate after getting position, then retrieve after server processing
+                    setTimeout(() => {
+                      this.send("conversation.item.truncate", {
+                        item_id: itemIdForPlaying,
+                        content_index: 0,
+                        audio_end_ms: audioEndMs,
+                      });
+                    }, 10);
+
+                    // Retrieve the item after truncation processing
+                    setTimeout(() => {
+                      this.send("conversation.item.retrieve", {
+                        item_id: itemIdForPlaying,
+                      });
+                    }, 1010);
+                  } else {
+                    logger.ai.debug(
+                      `Could not find item ID for playing response ${playingResponseId}, skipping truncation`,
+                      "AI"
+                    );
+                  }
                 }
               }
-            });
-            
+            );
+
             // If end_call is pending, user is interrupting during goodbye
             if (this.pendingEndCall) {
-              logger.ai.info("User interrupted during goodbye - canceling end_call and continuing conversation", "AI");
+              logger.ai.info(
+                "User interrupted during goodbye - canceling end_call and continuing conversation",
+                "AI"
+              );
               // Clear the pending end call since user wants to say something
               this.pendingEndCall = null;
               this.wasGoodbyeInterrupted = true;
               // Also notify AudioBridge to cancel any pending callbacks
               this.emit("cancelPendingEndCall");
             }
-            
+
             // Cancel any ongoing response
             this.send("response.cancel");
-            
+
             // Truncation is now handled in the getPlayingResponseId callback above
             // This ensures we truncate the correct item for the currently playing response
-            
+
             // Stop audio bridge playback
             logger.ai.debug("User interrupted - stopping audio playback", "AI");
             this.emit("conversationInterrupted");
-            
+
             // If we canceled a goodbye, ensure we'll create a response after speech stops
             if (wasCancelingGoodbye) {
               // Force a slightly longer watchdog to ensure response creation
               clearTimeout(this.watchdogTimer);
               this.watchdogTimer = setTimeout(() => {
-                logger.ai.info("Creating response after goodbye interruption", "AI");
+                logger.ai.info(
+                  "Creating response after goodbye interruption",
+                  "AI"
+                );
                 this.createResponse();
               }, 800); // Give user time to finish speaking
             }
             break;
 
-          case 'input_audio_buffer.speech_stopped':
+          case "input_audio_buffer.speech_stopped":
             logger.ai.debug("Speech stopped (user finished talking)");
             // Only start watchdog if we don't already have one running (from goodbye interruption)
             if (!this.watchdogTimer) {
@@ -279,21 +329,31 @@ export class OpenAIClient extends EventEmitter {
             }
             break;
 
-          case 'conversation.interrupted':
-            logger.ai.debug("User interrupted - stopping current response", "AI");
+          case "conversation.interrupted":
+            logger.ai.debug(
+              "User interrupted - stopping current response",
+              "AI"
+            );
             this.emit("conversationInterrupted");
-            
+
             // Flush any accumulated user transcript during interruption
-            if (this.currentUserTranscript && this.currentUserTranscript.trim()) {
-              logger.transcript("user", this.currentUserTranscript.trim(), false);
-              this.currentUserTranscript = ''; // Reset for next user speech
+            if (
+              this.currentUserTranscript &&
+              this.currentUserTranscript.trim()
+            ) {
+              logger.transcript(
+                "user",
+                this.currentUserTranscript.trim(),
+                false
+              );
+              this.currentUserTranscript = ""; // Reset for next user speech
             }
-            
+
             // Create new response turn immediately when user interrupts
             this.createResponse();
             break;
 
-          case 'response.created':
+          case "response.created":
             this.sawResponseCreated = true;
             clearTimeout(this.watchdogTimer);
             // Initialize transcript tracking for this response
@@ -302,11 +362,14 @@ export class OpenAIClient extends EventEmitter {
               this.currentResponseId = createdResponseId;
               const tracker = new ResponseTranscriptTracker(createdResponseId);
               this.responseTrackers.set(createdResponseId, tracker);
-              logger.ai.debug(`Created tracker for response ${createdResponseId}`, "AI");
+              logger.ai.debug(
+                `Created tracker for response ${createdResponseId}`,
+                "AI"
+              );
             }
             break;
-          
-          case 'response.audio_transcript.delta':
+
+          case "response.audio_transcript.delta":
             // Track transcript deltas as they come in
             if (event.response_id && event.delta) {
               const tracker = this.responseTrackers.get(event.response_id);
@@ -316,41 +379,44 @@ export class OpenAIClient extends EventEmitter {
             }
             break;
 
-          case 'conversation.item.input_audio_transcription.delta':
+          case "conversation.item.input_audio_transcription.delta":
             // Accumulate user transcription deltas
             if (!this.currentUserTranscript) {
-              this.currentUserTranscript = '';
+              this.currentUserTranscript = "";
             }
-            this.currentUserTranscript += event.delta || '';
+            this.currentUserTranscript += event.delta || "";
             break;
 
-          case 'conversation.item.input_audio_transcription.completed':
+          case "conversation.item.input_audio_transcription.completed":
             // Log the accumulated transcript
             if (this.currentUserTranscript) {
               logger.transcript("user", this.currentUserTranscript, false);
-              this.currentUserTranscript = ''; // Reset for next user speech
+              this.currentUserTranscript = ""; // Reset for next user speech
             } else if (event.transcript) {
               logger.transcript("user", event.transcript, false);
             }
             break;
 
-          case 'input_audio_buffer.transcription':
+          case "input_audio_buffer.transcription":
             logger.ai.debug("Received transcription event", event);
             if (event.transcript) {
               logger.transcript("user", event.transcript, true);
             }
             break;
 
-          case 'conversation.item.created':
+          case "conversation.item.created":
             logger.ai.debug("Conversation item created", event);
             // Store conversation items for getConversationItems()
             if (event.item) {
               this.conversationItems.push(event.item);
             }
-            
+
             // Handle function calls
             if (event.item?.type === "function_call") {
-              logger.ai.debug(`Function call created: ${event.item.name}`, "AI");
+              logger.ai.debug(
+                `Function call created: ${event.item.name}`,
+                "AI"
+              );
               if (event.item.name === "end_call") {
                 logger.ai.info(`AI ending call`, "AI");
               }
@@ -371,15 +437,18 @@ export class OpenAIClient extends EventEmitter {
             }
             break;
 
-          case 'response.audio_transcript.done':
+          case "response.audio_transcript.done":
             // We get the full transcript here, but we don't log it yet
             // We'll log in response.done (for completed) or conversation.item.truncated (for interrupted)
             if (event.transcript && event.response_id) {
-              logger.ai.debug(`Full transcript available for response ${event.response_id}`, "AI");
+              logger.ai.debug(
+                `Full transcript available for response ${event.response_id}`,
+                "AI"
+              );
             }
             break;
 
-          case 'response.text.delta':
+          case "response.text.delta":
             // Handle text deltas for text-only responses
             if (event.response_id && event.delta) {
               const tracker = this.responseTrackers.get(event.response_id);
@@ -389,10 +458,13 @@ export class OpenAIClient extends EventEmitter {
             }
             break;
 
-          case 'response.text.done':
+          case "response.text.done":
             // Handle text-only responses (fallback when no audio is generated)
             if (event.text && event.response_id) {
-              logger.ai.debug(`Text response done for ${event.response_id}`, "AI");
+              logger.ai.debug(
+                `Text response done for ${event.response_id}`,
+                "AI"
+              );
               const tracker = this.responseTrackers.get(event.response_id);
               if (tracker) {
                 // If this is a text-only response (no audio), log immediately
@@ -400,28 +472,40 @@ export class OpenAIClient extends EventEmitter {
                   const fullText = tracker.getFullTranscript() || event.text;
                   if (fullText) {
                     logger.transcript("assistant", fullText, false);
-                    logger.ai.debug(`Logged text-only response ${event.response_id} immediately`, "AI");
+                    logger.ai.debug(
+                      `Logged text-only response ${event.response_id} immediately`,
+                      "AI"
+                    );
                     this.cleanupResponse(event.response_id);
                   }
                 } else {
                   // Has audio, queue for playback completion as usual
                   const fullText = tracker.getFullTranscript() || event.text;
-                  if (fullText && !this.pendingTranscripts.has(event.response_id)) {
+                  if (
+                    fullText &&
+                    !this.pendingTranscripts.has(event.response_id)
+                  ) {
                     this.pendingTranscripts.set(event.response_id, fullText);
-                    logger.ai.debug(`Queued transcript for audio response ${event.response_id}`, "AI");
+                    logger.ai.debug(
+                      `Queued transcript for audio response ${event.response_id}`,
+                      "AI"
+                    );
                   }
                 }
               }
             }
             break;
 
-          case 'response.done':
+          case "response.done":
             // Note: response.done uses event.response.id not event.response_id
             {
               const rid = event.response?.id || event.response_id;
               // If this response contains an end_call and there was NO audio generated,
               // we should end immediately (no need to wait for playback).
-              if (this.pendingEndCall && this.pendingEndCall.responseId === rid) {
+              if (
+                this.pendingEndCall &&
+                this.pendingEndCall.responseId === rid
+              ) {
                 const hadAudio = this.responseHasAudio.has(rid);
                 if (!hadAudio) {
                   // Try to log any transcript we already have, otherwise mark for later flush
@@ -446,7 +530,7 @@ export class OpenAIClient extends EventEmitter {
             // Note: response.done uses event.response.id not event.response_id
             const responseId = event.response?.id || event.response_id;
             logger.ai.debug(`Response completed: ${responseId}`, "AI");
-            
+
             // Handle response completion based on whether it has audio
             const tracker = this.responseTrackers.get(responseId);
             if (tracker && !this.canceledResponses.has(responseId)) {
@@ -461,54 +545,78 @@ export class OpenAIClient extends EventEmitter {
                 // If text-only response, log immediately
                 if (!tracker.hasAudio()) {
                   logger.transcript("assistant", fullTranscript, false);
-                  logger.ai.debug(`Logged text-only response ${responseId} immediately on response.done`, "AI");
+                  logger.ai.debug(
+                    `Logged text-only response ${responseId} immediately on response.done`,
+                    "AI"
+                  );
                   this.cleanupResponse(responseId);
                 } else {
                   // Has audio, queue transcript to be logged when audio finishes playing
                   this.pendingTranscripts.set(responseId, fullTranscript);
-                  
+
                   // Emit event so VoiceAgent can set up transcript logging callback
-                  this.emit('responseGenerated', responseId);
+                  this.emit("responseGenerated", responseId);
                 }
               }
             } else if (this.canceledResponses.has(responseId)) {
               // This response was interrupted - will be logged in truncation handler
-              logger.ai.debug(`Skipping interrupted response ${responseId}`, "AI");
+              logger.ai.debug(
+                `Skipping interrupted response ${responseId}`,
+                "AI"
+              );
             }
-            
+
             // If playback already finished but transcript wasn't ready, try to flush now
             if (responseId && this.playbackCompleted.has(responseId)) {
-              logger.ai.debug(`Playback finished earlier; flushing transcript for ${responseId} on response.done`, "AI");
+              logger.ai.debug(
+                `Playback finished earlier; flushing transcript for ${responseId} on response.done`,
+                "AI"
+              );
               this.logQueuedTranscript(responseId);
             }
-            
+
             // Only set up safety cleanup timer for responses that still need it
-            if (tracker && tracker.hasAudio() && !this.canceledResponses.has(responseId)) {
+            if (
+              tracker &&
+              tracker.hasAudio() &&
+              !this.canceledResponses.has(responseId)
+            ) {
               this.scheduleSafetyCleanup(responseId, 120000); // 2 minutes safety timeout
             }
-            
+
             // Execute pending end_call only if THIS is the response that contains the end_call
-            if (this.pendingEndCall && this.pendingEndCall.responseId === responseId) {
-              logger.ai.debug(`Goodbye message generated, waiting for audio to finish playing`, "AI");
-              
+            if (
+              this.pendingEndCall &&
+              this.pendingEndCall.responseId === responseId
+            ) {
+              logger.ai.debug(
+                `Goodbye message generated, waiting for audio to finish playing`,
+                "AI"
+              );
+
               // Emit event to notify that this response needs to finish playing before ending
-              this.emit('responseWithEndCallComplete', responseId);
+              this.emit("responseWithEndCallComplete", responseId);
             }
             break;
 
-          case 'response.canceled':
+          case "response.canceled":
             logger.ai.debug(`Response canceled event received`, "AI");
             // Clear any pending end call if response was canceled
             this.pendingEndCall = null;
             break;
 
-          case 'conversation.item.truncated':
+          case "conversation.item.truncated":
             // Extract the actual playback position and item ID
             const playedMs = event.audio_end_ms || 0;
             const playedSeconds = playedMs / 1000;
             const itemId = event.item?.id;
-            logger.ai.debug(`Assistant message truncated at ${playedSeconds.toFixed(2)}s playback for item ${itemId}`, "AI");
-            
+            logger.ai.debug(
+              `Assistant message truncated at ${playedSeconds.toFixed(
+                2
+              )}s playback for item ${itemId}`,
+              "AI"
+            );
+
             // Find the correct response using item_id mapping first
             let foundInterrupted = false;
             if (itemId) {
@@ -518,36 +626,48 @@ export class OpenAIClient extends EventEmitter {
                 if (tracker) {
                   // Get the truncated transcript with planned continuation
                   const result = tracker.getTruncatedWithPlanned(playedMs);
-                  
+
                   if (result.spoken) {
                     // Create clean interrupted transcript format
                     const truncTime = playedSeconds.toFixed(1);
                     let cleanMessage = result.spoken;
-                    
+
                     // Add concise interruption info
                     cleanMessage += ` [interrupted by user here, after ${truncTime} sec.]`;
-                    
+
                     logger.transcript("assistant", cleanMessage, false);
-                    
+
                     // Log planned continuation separately as info (not in transcript)
                     if (result.planned) {
-                      const plannedClean = result.planned.replace(/\n/g, ' ').replace(/"/g, "'").trim();
-                      logger.ai.info(`Assistant planned to continue: "${plannedClean}" (not spoken)`, "AI");
+                      const plannedClean = result.planned
+                        .replace(/\n/g, " ")
+                        .replace(/"/g, "'")
+                        .trim();
+                      logger.ai.info(
+                        `Assistant planned to continue: "${plannedClean}" (not spoken)`,
+                        "AI"
+                      );
                     }
                   } else {
-                    logger.ai.debug(`No transcript available for interrupted response ${responseId}`, "AI");
+                    logger.ai.debug(
+                      `No transcript available for interrupted response ${responseId}`,
+                      "AI"
+                    );
                   }
-                  
+
                   // Clean up immediately after logging truncated transcript
                   this.cleanupResponse(responseId);
                   foundInterrupted = true;
                 }
               }
             }
-            
+
             // Fallback: scan all canceled responses if item mapping failed
             if (!foundInterrupted) {
-              logger.ai.debug(`No item mapping found for ${itemId}, scanning canceled responses`, "AI");
+              logger.ai.debug(
+                `No item mapping found for ${itemId}, scanning canceled responses`,
+                "AI"
+              );
               for (const [responseId, tracker] of this.responseTrackers) {
                 if (this.canceledResponses.has(responseId)) {
                   const result = tracker.getTruncatedWithPlanned(playedMs);
@@ -555,12 +675,18 @@ export class OpenAIClient extends EventEmitter {
                     const truncTime = playedSeconds.toFixed(1);
                     let cleanMessage = result.spoken;
                     cleanMessage += ` [interrupted by user here, after ${truncTime} sec.]`;
-                    
+
                     logger.transcript("assistant", cleanMessage, false);
-                    
+
                     if (result.planned) {
-                      const plannedClean = result.planned.replace(/\n/g, ' ').replace(/"/g, "'").trim();
-                      logger.ai.info(`Assistant planned to continue: "${plannedClean}" (not spoken)`, "AI");
+                      const plannedClean = result.planned
+                        .replace(/\n/g, " ")
+                        .replace(/"/g, "'")
+                        .trim();
+                      logger.ai.info(
+                        `Assistant planned to continue: "${plannedClean}" (not spoken)`,
+                        "AI"
+                      );
                     }
                   }
                   this.cleanupResponse(responseId);
@@ -569,68 +695,99 @@ export class OpenAIClient extends EventEmitter {
                 }
               }
             }
-            
+
             if (!foundInterrupted) {
-              logger.ai.debug(`No canceled response found for truncation event`, "AI");
+              logger.ai.debug(
+                `No canceled response found for truncation event`,
+                "AI"
+              );
             }
             break;
-            
-          case 'conversation.item.retrieved':
+
+          case "conversation.item.retrieved":
             // For debugging purposes only
-            logger.ai.debug(`Retrieved conversation item: ${event.item?.id}`, "AI");
+            logger.ai.debug(
+              `Retrieved conversation item: ${event.item?.id}`,
+              "AI"
+            );
             break;
 
-          case 'response.failed':
+          case "response.failed":
             logger.ai.error(`Response failed: ${JSON.stringify(event)}`, "AI");
             // Clear any pending end call if response failed
             this.pendingEndCall = null;
             break;
 
-          case 'error':
+          case "error":
             // Don't log "Cancellation failed" as error - it's expected when user interrupts
             if (event.error?.message?.includes("Cancellation failed")) {
-              logger.ai.debug("Response cancellation attempted but no active response", "AI");
+              logger.ai.debug(
+                "Response cancellation attempted but no active response",
+                "AI"
+              );
             } else {
               logger.ai.error("Realtime API error:", event.error);
-              
+
               // Handle truncation errors by logging fallback transcript
-              if (event.error?.message?.includes("Audio content of") && 
-                  event.error?.message?.includes("is already shorter than")) {
-                logger.ai.debug("Truncation failed - logging fallback transcript", "AI");
-                
+              if (
+                event.error?.message?.includes("Audio content of") &&
+                event.error?.message?.includes("is already shorter than")
+              ) {
+                logger.ai.debug(
+                  "Truncation failed - logging fallback transcript",
+                  "AI"
+                );
+
                 // Find the currently playing response and log its transcript
-                this.emit("getPlayingResponseId", (playingResponseId: string | null) => {
-                  if (playingResponseId && this.canceledResponses.has(playingResponseId)) {
-                    const tracker = this.responseTrackers.get(playingResponseId);
-                    if (tracker) {
-                      // Use a safe truncation point based on tracker's total audio
-                      const totalMs = tracker.getTotalAudioDurationMs();
-                      const safeMs = Math.min(1000, totalMs); // Use smaller of 1s or total audio
-                      
-                      const result = tracker.getTruncatedWithPlanned(safeMs);
-                      if (result.spoken) {
-                        const truncTime = (safeMs / 1000).toFixed(1);
-                        let cleanMessage = result.spoken;
-                        cleanMessage += ` [interrupted by user here, after ${truncTime} sec.]`;
-                        
-                        logger.transcript("assistant", cleanMessage, false);
-                        
-                        if (result.planned) {
-                          const plannedClean = result.planned.replace(/\n/g, ' ').replace(/"/g, "'").trim();
-                          logger.ai.info(`Assistant planned to continue: "${plannedClean}" (not spoken)`, "AI");
+                this.emit(
+                  "getPlayingResponseId",
+                  (playingResponseId: string | null) => {
+                    if (
+                      playingResponseId &&
+                      this.canceledResponses.has(playingResponseId)
+                    ) {
+                      const tracker =
+                        this.responseTrackers.get(playingResponseId);
+                      if (tracker) {
+                        // Use a safe truncation point based on tracker's total audio
+                        const totalMs = tracker.getTotalAudioDurationMs();
+                        const safeMs = Math.min(1000, totalMs); // Use smaller of 1s or total audio
+
+                        const result = tracker.getTruncatedWithPlanned(safeMs);
+                        if (result.spoken) {
+                          const truncTime = (safeMs / 1000).toFixed(1);
+                          let cleanMessage = result.spoken;
+                          cleanMessage += ` [interrupted by user here, after ${truncTime} sec.]`;
+
+                          logger.transcript("assistant", cleanMessage, false);
+
+                          if (result.planned) {
+                            const plannedClean = result.planned
+                              .replace(/\n/g, " ")
+                              .replace(/"/g, "'")
+                              .trim();
+                            logger.ai.info(
+                              `Assistant planned to continue: "${plannedClean}" (not spoken)`,
+                              "AI"
+                            );
+                          }
+                        } else {
+                          // Fallback: log whatever text we have
+                          const fullText = tracker.getFullTranscript();
+                          if (fullText) {
+                            logger.transcript(
+                              "assistant",
+                              `${fullText} [interrupted by user]`,
+                              false
+                            );
+                          }
                         }
-                      } else {
-                        // Fallback: log whatever text we have
-                        const fullText = tracker.getFullTranscript();
-                        if (fullText) {
-                          logger.transcript("assistant", `${fullText} [interrupted by user]`, false);
-                        }
+
+                        this.cleanupResponse(playingResponseId);
                       }
-                      
-                      this.cleanupResponse(playingResponseId);
                     }
                   }
-                });
+                );
               }
             }
             break;
@@ -655,7 +812,10 @@ export class OpenAIClient extends EventEmitter {
                 eventStr.includes("function") ||
                 eventStr.includes("tool")
               ) {
-                logger.ai.debug(`Found function data in response event: ${event.type}`, "AI");
+                logger.ai.debug(
+                  `Found function data in response event: ${event.type}`,
+                  "AI"
+                );
               }
             }
             // Log other conversation events
@@ -673,19 +833,19 @@ export class OpenAIClient extends EventEmitter {
       }
     });
 
-    this.ws.on('open', () => {
-      logger.ai.debug('WebSocket connection opened', "AI");
+    this.ws.on("open", () => {
+      logger.ai.debug("WebSocket connection opened", "AI");
       this.isConnected = true;
       this.setupSession();
     });
 
-    this.ws.on('close', () => {
-      logger.ai.debug('WebSocket connection closed', "AI");
+    this.ws.on("close", () => {
+      logger.ai.debug("WebSocket connection closed", "AI");
       this.isConnected = false;
     });
 
-    this.ws.on('error', (error) => {
-      logger.ai.error('WebSocket error:', error);
+    this.ws.on("error", (error) => {
+      logger.ai.error("WebSocket error:", error);
     });
   }
 
@@ -694,12 +854,15 @@ export class OpenAIClient extends EventEmitter {
 
     try {
       const url = "wss://api.openai.com/v1/realtime?model=gpt-realtime";
-      
+
       // Create WebSocket with proper authentication headers
       this.ws = new WebSocket(url, [], {
         finishRequest: (request) => {
-          request.setHeader('Authorization', `Bearer ${this.config.openaiApiKey}`);
-          request.setHeader('OpenAI-Beta', 'realtime=v1');
+          request.setHeader(
+            "Authorization",
+            `Bearer ${this.config.openaiApiKey}`
+          );
+          request.setHeader("OpenAI-Beta", "realtime=v1");
           request.end();
         },
       });
@@ -711,18 +874,21 @@ export class OpenAIClient extends EventEmitter {
       await new Promise<void>((resolve, reject) => {
         const connectionErrorHandler = (error: Error) => {
           this.disconnect();
-          reject(new Error(`Could not connect to OpenAI Realtime API: ${error.message}`));
+          reject(
+            new Error(
+              `Could not connect to OpenAI Realtime API: ${error.message}`
+            )
+          );
         };
 
-        this.ws!.on('error', connectionErrorHandler);
-        this.ws!.on('open', () => {
+        this.ws!.on("error", connectionErrorHandler);
+        this.ws!.on("open", () => {
           getLogger().ai.debug("Connected to OpenAI Realtime API", "AI");
-          this.ws!.removeListener('error', connectionErrorHandler);
+          this.ws!.removeListener("error", connectionErrorHandler);
           this.isConnected = true;
           resolve();
         });
       });
-
     } catch (error) {
       getLogger().ai.error("Failed to connect to OpenAI:", error);
       throw error;
@@ -733,7 +899,7 @@ export class OpenAIClient extends EventEmitter {
     if (!this.isConnected || !this.ws) return;
 
     // Send session.update with all configuration including tools
-    this.send('session.update', {
+    this.send("session.update", {
       session: {
         instructions: this.config.instructions,
         voice: this.config.voice || "marin",
@@ -748,7 +914,8 @@ export class OpenAIClient extends EventEmitter {
           {
             type: "function",
             name: "end_call",
-            description: "End the phone call immediately when requested or when conversation is complete",
+            description:
+              "End the phone call immediately when requested or when conversation is complete",
             parameters: {
               type: "object",
               properties: {
@@ -807,12 +974,12 @@ export class OpenAIClient extends EventEmitter {
 
   // Generate unique event ID
   private generateEventId(): string {
-    const chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+    const chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
     const length = 21;
     const str = Array(length - 4)
       .fill(0)
       .map(() => chars[Math.floor(Math.random() * chars.length)])
-      .join('');
+      .join("");
     return `evt_${str}`;
   }
 
@@ -831,8 +998,8 @@ export class OpenAIClient extends EventEmitter {
     try {
       // Convert audio data to base64
       const base64Audio = this.arrayBufferToBase64(audioData);
-      
-      this.send('input_audio_buffer.append', {
+
+      this.send("input_audio_buffer.append", {
         audio: base64Audio,
       });
     } catch (error) {
@@ -845,7 +1012,7 @@ export class OpenAIClient extends EventEmitter {
     if (arrayBuffer instanceof Int16Array) {
       arrayBuffer = arrayBuffer.buffer as ArrayBuffer;
     }
-    let binary = '';
+    let binary = "";
     const bytes = new Uint8Array(arrayBuffer);
     const chunkSize = 0x1000; // 4KB chunk size for lower latency
     for (let i = 0; i < bytes.length; i += chunkSize) {
@@ -863,16 +1030,16 @@ export class OpenAIClient extends EventEmitter {
 
     try {
       getLogger().ai.debug(`Sending text to OpenAI: "${text}"`);
-      
+
       // Create conversation item with text content
-      this.send('conversation.item.create', {
+      this.send("conversation.item.create", {
         item: {
-          type: 'message',
-          role: 'user',
-          content: [{ type: 'input_text', text }],
+          type: "message",
+          role: "user",
+          content: [{ type: "input_text", text }],
         },
       });
-      
+
       // Request response generation
       this.createResponse();
     } catch (error) {
@@ -888,14 +1055,16 @@ export class OpenAIClient extends EventEmitter {
 
     try {
       getLogger().ai.debug("Creating response with tools included", "AI");
-      
+
       // If we're recovering from a goodbye interruption, add context
       let instructions = this.config.instructions;
       if (this.wasGoodbyeInterrupted) {
-        instructions = "The user interrupted your goodbye. They want to continue the conversation. Listen to what they have to say and respond appropriately. " + instructions;
+        instructions =
+          "The user interrupted your goodbye. They want to continue the conversation. Listen to what they have to say and respond appropriately. " +
+          instructions;
         this.wasGoodbyeInterrupted = false; // Reset flag
       }
-      
+
       // Send response.create with tools included to ensure function calling works
       this.send("response.create", {
         response: {
@@ -906,7 +1075,8 @@ export class OpenAIClient extends EventEmitter {
             {
               type: "function",
               name: "end_call",
-              description: "End the phone call immediately when requested or when conversation is complete",
+              description:
+                "End the phone call immediately when requested or when conversation is complete",
               parameters: {
                 type: "object",
                 properties: {
@@ -926,7 +1096,9 @@ export class OpenAIClient extends EventEmitter {
     }
   }
 
-  onAudioReceived(callback: (audio: Int16Array, responseId?: string) => void): void {
+  onAudioReceived(
+    callback: (audio: Int16Array, responseId?: string) => void
+  ): void {
     this.onAudioCallback = callback;
   }
 
@@ -978,7 +1150,10 @@ export class OpenAIClient extends EventEmitter {
     }
     // Transcript not ready yet: mark playback completed so we can log when it arrives
     if (!this.playbackCompleted.has(responseId)) {
-      getLogger().ai.debug(`Playback completed before transcript ready for ${responseId} - will log on response.done`, "AI");
+      getLogger().ai.debug(
+        `Playback completed before transcript ready for ${responseId} - will log on response.done`,
+        "AI"
+      );
       this.playbackCompleted.add(responseId);
     }
     // Optionally, as a fallback if the response is text-only and already fully accumulated in the tracker:
@@ -1001,13 +1176,16 @@ export class OpenAIClient extends EventEmitter {
     if (existingTimer) {
       clearTimeout(existingTimer);
     }
-    
+
     // Set up new safety timer
     const timer = setTimeout(() => {
-      getLogger().ai.debug(`Safety cleanup triggered for response ${responseId}`, "AI");
+      getLogger().ai.debug(
+        `Safety cleanup triggered for response ${responseId}`,
+        "AI"
+      );
       this.cleanupResponse(responseId);
     }, timeoutMs);
-    
+
     this.cleanupTimers.set(responseId, timer);
   }
 
@@ -1021,22 +1199,25 @@ export class OpenAIClient extends EventEmitter {
       clearTimeout(timer);
       this.cleanupTimers.delete(responseId);
     }
-    
+
     // Clean up all tracking data
     this.responseTrackers.delete(responseId);
     this.canceledResponses.delete(responseId);
     this.playbackCompleted.delete(responseId);
     this.responseHasAudio.delete(responseId);
     this.pendingTranscripts.delete(responseId);
-    
+
     // Clean up item mapping (scan and remove entries pointing to this response)
     for (const [itemId, mappedResponseId] of this.itemToResponseMap) {
       if (mappedResponseId === responseId) {
         this.itemToResponseMap.delete(itemId);
       }
     }
-    
-    getLogger().ai.debug(`Cleaned up tracking data for response ${responseId}`, "AI");
+
+    getLogger().ai.debug(
+      `Cleaned up tracking data for response ${responseId}`,
+      "AI"
+    );
   }
 
   private startResponseWatchdog(): void {
@@ -1065,19 +1246,22 @@ export class OpenAIClient extends EventEmitter {
     this.send("response.create", {
       response: {
         modalities: ["text"],
-        instructions: "End the call now by calling the end_call tool. Output nothing else.",
+        instructions:
+          "End the call now by calling the end_call tool. Output nothing else.",
         tool_choice: "required",
         tools: [
           {
             type: "function",
             name: "end_call",
-            description: "Immediately end the current phone call when appropriate, specifying the reason for ending the call.",
+            description:
+              "Immediately end the current phone call when appropriate, specifying the reason for ending the call.",
             parameters: {
               type: "object",
               properties: {
                 reason: {
                   type: "string",
-                  description: "Reason for ending the call (e.g. conversation_complete, user_request, task_accomplished)",
+                  description:
+                    "Reason for ending the call (e.g. conversation_complete, user_request, task_accomplished)",
                 },
               },
               required: [],
@@ -1104,14 +1288,17 @@ export class OpenAIClient extends EventEmitter {
       done = true;
       clearTimeout(timer);
     };
-    
+
     // Set a flag to check for function call completion
-    this.once('functionCallExecuted', checkDone);
+    this.once("functionCallExecuted", checkDone);
   }
 
   public executePendingEndCall(): void {
     if (this.pendingEndCall) {
-      getLogger().ai.debug(`Executing pending end_call: ${this.pendingEndCall.reason}`, "AI");
+      getLogger().ai.debug(
+        `Executing pending end_call: ${this.pendingEndCall.reason}`,
+        "AI"
+      );
       this.executeEndCallFunction(this.pendingEndCall.reason);
       this.pendingEndCall = null;
     }
@@ -1126,7 +1313,7 @@ export class OpenAIClient extends EventEmitter {
     }
 
     // Emit event for forceEndCallTurn timer cleanup
-    this.emit('functionCallExecuted');
+    this.emit("functionCallExecuted");
 
     // Return success result
     return `Call ended successfully. Reason: ${reason}`;
