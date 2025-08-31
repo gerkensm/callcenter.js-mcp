@@ -16,15 +16,7 @@ export interface VoiceCharacteristics {
 }
 
 export const VOICE_CHARACTERISTICS: Record<string, VoiceCharacteristics> = {
-  // Standard voices (less steerable, used in ChatGPT)
-  nova: {
-    name: 'nova',
-    gender: 'female',
-    generation: 'standard',
-    description: 'Clear, bright feminine voice with excellent clarity',
-    genderScale: 10,
-    steerable: false
-  },
+  // Current Realtime API voices (10 total)
   shimmer: {
     name: 'shimmer',
     gender: 'female',
@@ -33,24 +25,7 @@ export const VOICE_CHARACTERISTICS: Record<string, VoiceCharacteristics> = {
     genderScale: 7,
     steerable: false
   },
-  fable: {
-    name: 'fable',
-    gender: 'androgynous',
-    generation: 'standard',
-    description: 'British-accented voice with neutral characteristics',
-    genderScale: 6,
-    steerable: false
-  },
-  onyx: {
-    name: 'onyx',
-    gender: 'male',
-    generation: 'standard',
-    description: 'Deep, authoritative masculine voice',
-    genderScale: 1,
-    steerable: false
-  },
   
-  // New generation voices (more adaptive and steerable)
   alloy: {
     name: 'alloy',
     gender: 'androgynous',
@@ -71,7 +46,7 @@ export const VOICE_CHARACTERISTICS: Record<string, VoiceCharacteristics> = {
     name: 'ash',
     gender: 'androgynous',
     generation: 'new',
-    description: 'Neutral voice with good clarity and adaptability',
+    description: 'Clear and precise voice with good clarity',
     genderScale: 5,
     steerable: true
   },
@@ -79,7 +54,7 @@ export const VOICE_CHARACTERISTICS: Record<string, VoiceCharacteristics> = {
     name: 'ballad',
     gender: 'female',
     generation: 'new',
-    description: 'Warm, expressive feminine voice with emotional range',
+    description: 'Melodic and smooth feminine voice with emotional range',
     genderScale: 8,
     steerable: true
   },
@@ -87,7 +62,7 @@ export const VOICE_CHARACTERISTICS: Record<string, VoiceCharacteristics> = {
     name: 'coral',
     gender: 'female',
     generation: 'new',
-    description: 'Friendly, approachable feminine voice',
+    description: 'Warm and friendly feminine voice',
     genderScale: 8,
     steerable: true
   },
@@ -95,7 +70,7 @@ export const VOICE_CHARACTERISTICS: Record<string, VoiceCharacteristics> = {
     name: 'sage',
     gender: 'androgynous',
     generation: 'new',
-    description: 'Calm, measured voice with neutral characteristics',
+    description: 'Calm and thoughtful voice with neutral characteristics',
     genderScale: 5,
     steerable: true
   },
@@ -103,12 +78,12 @@ export const VOICE_CHARACTERISTICS: Record<string, VoiceCharacteristics> = {
     name: 'verse',
     gender: 'androgynous',
     generation: 'new',
-    description: 'Versatile voice with good range and adaptability',
+    description: 'Versatile and expressive voice with good range',
     genderScale: 6,
     steerable: true
   },
   
-  // Latest voices (December 2024)
+  // Latest voices (August 2025) - Exclusive to Realtime API
   cedar: {
     name: 'cedar',
     gender: 'male',
@@ -122,80 +97,6 @@ export const VOICE_CHARACTERISTICS: Record<string, VoiceCharacteristics> = {
     gender: 'female',
     generation: 'new',
     description: 'Clear, professional feminine voice',
-    genderScale: 8,
-    steerable: true
-  },
-  
-  // Newest voices (2025)
-  arbor: {
-    name: 'arbor',
-    gender: 'androgynous',
-    generation: 'new',
-    description: 'Easygoing and versatile voice',
-    genderScale: 5,
-    steerable: true
-  },
-  breeze: {
-    name: 'breeze',
-    gender: 'androgynous',
-    generation: 'new',
-    description: 'Animated and earnest voice',
-    genderScale: 6,
-    steerable: true
-  },
-  cove: {
-    name: 'cove',
-    gender: 'androgynous',
-    generation: 'new',
-    description: 'Composed and direct voice',
-    genderScale: 4,
-    steerable: true
-  },
-  ember: {
-    name: 'ember',
-    gender: 'female',
-    generation: 'new',
-    description: 'Confident and optimistic voice',
-    genderScale: 7,
-    steerable: true
-  },
-  juniper: {
-    name: 'juniper',
-    gender: 'female',
-    generation: 'new',
-    description: 'Open and upbeat voice',
-    genderScale: 8,
-    steerable: true
-  },
-  maple: {
-    name: 'maple',
-    gender: 'androgynous',
-    generation: 'new',
-    description: 'Cheerful and candid voice',
-    genderScale: 6,
-    steerable: true
-  },
-  sol: {
-    name: 'sol',
-    gender: 'androgynous',
-    generation: 'new',
-    description: 'Savvy and relaxed voice',
-    genderScale: 5,
-    steerable: true
-  },
-  spruce: {
-    name: 'spruce',
-    gender: 'male',
-    generation: 'new',
-    description: 'Calm and affirming voice',
-    genderScale: 3,
-    steerable: true
-  },
-  vale: {
-    name: 'vale',
-    gender: 'female',
-    generation: 'new',
-    description: 'Bright and inquisitive voice',
     genderScale: 8,
     steerable: true
   }

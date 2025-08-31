@@ -458,7 +458,7 @@ export function loadConfigFromEnv(): Partial<Config> {
     },
     ai: {
       openaiApiKey: process.env.OPENAI_API_KEY || '',
-      voice: (process.env.OPENAI_VOICE as any) || 'alloy',
+      voice: (process.env.OPENAI_VOICE as any) || 'auto',
       instructions: process.env.OPENAI_INSTRUCTIONS
     }
   };

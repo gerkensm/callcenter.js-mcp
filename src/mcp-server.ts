@@ -56,8 +56,8 @@ const SIMPLE_CALL_TOOL = {
       },
       voice: {
         type: "string",
-        description: "Voice selection (optional, recommended: 'auto'). When set to 'auto', the AI analyzes the call context and selects the optimal voice for success. Manual options: marin (professional feminine), cedar (calm masculine), alloy (neutral tech), echo (conversational), shimmer (warm), nova (energetic), onyx (authoritative), and others. Using 'auto' typically yields better results as it matches voice to context.",
-        enum: ["auto", "alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse", "arbor", "breeze", "cedar", "cove", "ember", "juniper", "maple", "marin", "sol", "spruce", "vale"],
+        description: "Voice selection (optional, recommended: 'auto'). When set to 'auto', the AI analyzes the call context and selects the optimal voice for success. Manual options: marin (professional feminine), cedar (calm masculine), alloy (neutral tech), echo (conversational), shimmer (warm), sage (thoughtful), coral (friendly). Using 'auto' typically yields better results as it matches voice to context.",
+        enum: ["auto", "alloy", "ash", "ballad", "cedar", "coral", "echo", "marin", "sage", "shimmer", "verse"],
         default: "auto"
       }
     },
@@ -184,8 +184,8 @@ const ADVANCED_CALL_TOOL = {
       // Voice selection
       voice: {
         type: "string",
-        description: "Voice selection (strongly recommended: 'auto'). In 'auto' mode, AI intelligently selects the optimal voice based on formality, goal, industry, and language. Manual selection available but 'auto' typically achieves better results. Voice categories - PROFESSIONAL: marin/cedar/alloy, FRIENDLY: coral/echo/shimmer, AUTHORITATIVE: onyx/sage, ENERGETIC: nova/ember/vale, CALM: spruce/fable. Most users should use 'auto'.",
-        enum: ["auto", "alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse", "arbor", "breeze", "cedar", "cove", "ember", "juniper", "maple", "marin", "sol", "spruce", "vale"],
+        description: "Voice selection (strongly recommended: 'auto'). In 'auto' mode, AI intelligently selects the optimal voice based on formality, goal, industry, and language. Manual selection available but 'auto' typically achieves better results. Voice categories - PROFESSIONAL: marin/cedar/alloy, FRIENDLY: coral/echo/shimmer, AUTHORITATIVE: cedar/sage, ENERGETIC: verse/echo, CALM: sage/ballad. Most users should use 'auto'.",
+        enum: ["auto", "alloy", "ash", "ballad", "cedar", "coral", "echo", "marin", "sage", "shimmer", "verse"],
         default: "auto"
       },
       
@@ -209,7 +209,7 @@ const ADVANCED_CALL_TOOL = {
             type: "object",
             properties: {
               openaiApiKey: { type: "string", description: "OpenAI API key" },
-              voice: { type: "string", enum: ["alloy", "echo", "fable", "onyx", "nova", "shimmer"], default: "nova" }
+              voice: { type: "string", enum: ["alloy", "ash", "ballad", "cedar", "coral", "echo", "marin", "sage", "shimmer", "verse"], default: "marin" }
             },
             required: ["openaiApiKey"]
           }
@@ -291,7 +291,7 @@ const ADVANCED_CALL_TOOL = {
           },
           ai: {
             openaiApiKey: "sk-...",
-            voice: "nova"
+            voice: "marin"
           }
         },
         log_level: "quiet",

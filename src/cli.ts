@@ -34,7 +34,7 @@ program
   .option('--brief <text>', 'Call brief to generate instructions from (e.g., "Call Bocca di Bacco and book a table for 2 at 19:30 for Torben")')
   .option('--instructions <text>', 'Direct instructions for the AI agent (overrides config and brief)')
   .option('--user-name <name>', 'Your name for the AI to use when calling on your behalf')
-  .option('--voice <name>', 'Voice to use (auto, alloy, echo, nova, etc.). Default: auto')
+  .option('--voice <name>', 'Voice to use (auto, alloy, ash, ballad, cedar, coral, echo, marin, sage, shimmer, verse). Default: auto')
   .action(async (number: string, options: any) => {
     try {
       // Determine log level from options (default to info mode)

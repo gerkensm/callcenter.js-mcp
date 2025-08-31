@@ -14,27 +14,27 @@ Choose the most appropriate voice based on these criteria:
 
 ### Quick Selection Rules
 **By Context:**
-- Trust + Authority needed → cedar, onyx
+- Trust + Authority needed → cedar, sage
 - Friendly + Efficient → marin, alloy  
-- Warm + Empathetic → shimmer, fable
-- Upbeat + Energetic → echo, nova
+- Warm + Empathetic → shimmer, coral
+- Upbeat + Energetic → echo, verse
 
 **By Industry:**
 - Healthcare/Wellness → shimmer, sage (calming)
-- Finance/Legal → cedar, onyx (authoritative)
+- Finance/Legal → cedar, sage (authoritative)
 - Retail/Support → marin, coral (friendly)
 - Tech/Developer → alloy, ash (precise)
-- Education → fable, echo (engaging)
+- Education → ballad, echo (engaging)
 
 **By Formality:**
-- High: cedar, onyx, marin
-- Medium: alloy, sage, ash
-- Low: echo, coral, maple
+- High: cedar, marin, sage
+- Medium: alloy, verse, ash
+- Low: echo, coral, shimmer
 
-### Available Voices
-- **Feminine**: marin, shimmer, echo, nova, coral, ballad, ember, juniper, vale
-- **Masculine**: cedar, onyx, echo, spruce
-- **Neutral**: alloy, fable, sage, ash, verse, arbor, breeze, cove, maple, sol
+### Available Voices (10 total)
+- **Feminine**: marin, shimmer, coral, ballad
+- **Masculine**: cedar, echo
+- **Neutral**: alloy, sage, ash, verse
 
 ### Selection Priority
 1. Match formality level to context

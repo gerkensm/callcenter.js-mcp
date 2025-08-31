@@ -135,7 +135,8 @@ Your MCP Client will automatically handle the entire conversation using the AI V
 - 🎙️ **Multiple Codec Support**: G.722 wideband (16kHz) + G.711 fallback for broad compatibility
 - 🤖 **AI-Powered Conversations**: Uses OpenAI's Real-Time Voice API with the latest `gpt-realtime` model (released August 28, 2025) for actual calls, with o3-mini model for instruction generation
 - 🌍 **Automatic Language Detection**: Intelligently detects conversation language from call briefs and configures transcription accordingly
-- 🎭 **Voice Characteristics**: Full support for all OpenAI voices with gender and personality awareness
+- 🎭 **Auto Voice Selection**: New 'auto' mode where o3-mini selects optimal voice based on call context (formality, industry, goals)
+- 🔊 **Voice Characteristics**: Full support for all 10 OpenAI Realtime API voices with gender and personality awareness
 - 🌐 **Expanded SIP Support**: Configurations for common SIP providers (Fritz!Box tested, others experimental)
 - 🔧 **Smart Configuration**: Auto-detects provider requirements and optimizes settings
 - 📞 **Enterprise-Ready**: Supports advanced SIP features (STUN/TURN, session timers, transport fallback)
@@ -174,7 +175,7 @@ SIP_PASSWORD=your_password
 SIP_SERVER_IP=192.168.1.1
 OPENAI_API_KEY=sk-your-key-here
 SIP_PROVIDER=fritz-box
-OPENAI_VOICE=alloy
+OPENAI_VOICE=auto
 EOF
 
 # Run from GitHub (loads .env automatically)  
@@ -386,6 +387,7 @@ Options:
   --brief <text>                Call brief to generate instructions from (RECOMMENDED)
   --instructions <text>         Direct AI instructions (use only for specific custom behavior)
   --user-name <name>            Your name for the AI to use when calling
+  --voice <name>                Voice to use (default: auto) - see Voice Selection section
   --help                        Display help information
 ```
 
@@ -492,7 +494,7 @@ interface Config {
   };
   ai: {
     openaiApiKey: string;
-    voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+    voice?: 'auto' | 'alloy' | 'ash' | 'ballad' | 'cedar' | 'coral' | 'echo' | 'marin' | 'sage' | 'shimmer' | 'verse';
     instructions?: string;
     brief?: string;
     userName?: string;
@@ -526,7 +528,7 @@ STUN_SERVERS="stun:stun.l.google.com:19302,stun:stun2.l.google.com:19302"
 SIP_TRANSPORTS="udp,tcp"
 
 # OpenAI Configuration  
-OPENAI_VOICE=alloy                                        # alloy, echo, fable, onyx, nova, shimmer
+OPENAI_VOICE=auto                                        # auto (recommended), marin, cedar, alloy, echo, shimmer, coral, sage, ash, ballad, verse
 OPENAI_INSTRUCTIONS="Your custom AI instructions"
 
 # Advanced SIP Features
@@ -839,6 +841,104 @@ The o3-mini brief processor automatically:
 - **Use `--instructions`** only when you need very specific, custom behavior
 - **Brief processing** is perfect for: reservations, appointments, business calls, customer service
 - **Direct instructions** are better for: highly specialized scenarios, testing, or when you've already perfected your prompt
+
+## 🎤 Voice Selection
+
+The AI agent supports 10 different voices from OpenAI's Realtime API, each with unique characteristics. By default, the system uses **auto mode** where o3-mini intelligently selects the optimal voice based on your call's context.
+
+### Available Voices
+
+| Voice | Gender | Description | Best For |
+|-------|--------|-------------|----------|
+| **marin** | Female | Clear, professional feminine voice | Customer support, appointments, general assistance |
+| **cedar** | Male | Natural masculine voice with warm undertones | Advisory roles, serious matters, enterprise contexts |
+| **alloy** | Neutral | Professional voice with good adaptability | Technical support, neutral business contexts |
+| **echo** | Male | Conversational masculine voice | Casual interactions, friendly service |
+| **shimmer** | Female | Warm, expressive feminine voice | Healthcare, empathetic conversations |
+| **coral** | Female | Warm and friendly feminine voice | Retail, customer service |
+| **sage** | Neutral | Calm and thoughtful voice | Healthcare, counseling, professional advice |
+| **ash** | Neutral | Clear and precise voice | Technical explanations, instructions |
+| **ballad** | Female | Melodic and smooth feminine voice | Education, storytelling |
+| **verse** | Neutral | Versatile and expressive voice | Dynamic conversations, varied contexts |
+
+### Auto Voice Selection (Recommended)
+
+The **auto mode** (default) uses o3-mini to analyze your call context and select the most appropriate voice:
+
+```bash
+# Auto mode - AI selects the best voice
+npm start call "+1234567890" --brief "Call doctor's office to schedule appointment" --user-name "John"
+# Might select: sage (calm, professional for healthcare)
+
+# Auto mode adapts to context
+npm start call "+1234567890" --brief "Call pizza place to order delivery" --user-name "Sarah"  
+# Might select: coral or echo (friendly, casual for food service)
+```
+
+### Manual Voice Selection
+
+You can override auto selection when you have specific requirements:
+
+```bash
+# Use a specific voice
+npm start call "+1234567890" --voice marin --brief "Call to book reservation" --user-name "Alex"
+
+# Professional contexts
+npm start call "+1234567890" --voice cedar --brief "Call bank about account" --user-name "Pat"
+
+# Friendly service calls
+npm start call "+1234567890" --voice coral --brief "Call flower shop for delivery" --user-name "Sam"
+```
+
+### Configuration Options
+
+Set default voice in your config file or environment:
+
+```json
+// config.json
+{
+  "ai": {
+    "voice": "auto",  // or specific voice like "marin", "cedar", etc.
+    // ...
+  }
+}
+```
+
+```bash
+# Environment variable
+export OPENAI_VOICE=auto  # or marin, cedar, alloy, etc.
+```
+
+### Voice Selection Guidelines
+
+The auto mode considers these factors:
+
+- **Formality Level**: High (cedar, marin, sage) → Medium (alloy, verse) → Low (echo, coral, shimmer)
+- **Industry Context**: Healthcare (sage, shimmer), Finance (cedar, sage), Retail (coral, echo), Tech (alloy, ash)
+- **Goal Type**: Authority needed (cedar, sage), Friendliness (coral, shimmer), Efficiency (marin, alloy)
+- **Language**: Voices adapt to detected language from your call brief
+
+### MCP Integration
+
+The MCP tools strongly recommend auto mode but support manual override:
+
+```typescript
+// Simple call - auto voice selection
+mcp__callcenter_js__simple_call({
+  phone_number: "+1234567890",
+  brief: "Call restaurant for reservation",
+  caller_name: "John",
+  voice: "auto"  // Optional, defaults to auto
+})
+
+// Advanced call - manual voice selection
+mcp__callcenter_js__advanced_call({
+  phone_number: "+1234567890",
+  goal: "Schedule medical appointment",
+  user_name: "Jane",
+  voice: "sage"  // Override for specific voice
+})
+```
 
 ## 🔄 Advanced Features
 

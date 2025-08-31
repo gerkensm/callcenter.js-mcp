@@ -192,6 +192,9 @@ interface CallOptions {
   /** Your name for the AI to use when calling */
   userName?: string;
   
+  /** Voice to use ('auto' for AI selection, or specific voice name) */
+  voice?: string;
+  
   /** Enable recording with optional filename */
   recording?: boolean | string;
   
@@ -305,7 +308,7 @@ interface Config {
   };
   ai: {
     openaiApiKey: string;
-    voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+    voice?: 'auto' | 'alloy' | 'ash' | 'ballad' | 'cedar' | 'coral' | 'echo' | 'marin' | 'sage' | 'shimmer' | 'verse';
     instructions?: string;
     brief?: string;
   };
@@ -363,7 +366,7 @@ const config = {
   },
   ai: {
     openaiApiKey: process.env.OPENAI_API_KEY,
-    voice: 'nova'
+    voice: 'auto'
   }
 };
 
