@@ -409,6 +409,18 @@ export class OpenAIClient extends EventEmitter {
             // Store conversation items for getConversationItems()
             if (event.item) {
               this.conversationItems.push(event.item);
+              
+              // Map assistant items immediately when created
+              if (event.item.role === "assistant" && event.item.id) {
+                // Try to map to current response if available
+                if (this.currentResponseId) {
+                  this.itemToResponseMap.set(event.item.id, this.currentResponseId);
+                  logger.ai.debug(
+                    `Early mapped item ${event.item.id} to response ${this.currentResponseId}`,
+                    "AI"
+                  );
+                }
+              }
             }
 
             // Handle function calls
