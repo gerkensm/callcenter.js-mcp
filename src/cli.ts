@@ -7,6 +7,7 @@ import { loadConfig, createSampleConfig, loadConfigFromEnv } from './config.js';
 import { Config } from './types.js';
 import { initializeLogger, LogLevel } from './logger.js';
 import { CallBriefProcessor, CallBriefError } from './call-brief-processor.js';
+import { isValidLanguageCode } from './language-utils.js';
 import * as path from 'path';
 
 const program = new Command();
@@ -145,15 +146,19 @@ program
       // Update config with final instructions and language
       if (config.ai) {
         config.ai.instructions = finalInstructions;
-        if (detectedLanguage) {
+        if (detectedLanguage && isValidLanguageCode(detectedLanguage)) {
           config.ai.language = detectedLanguage;
           logger.info(`Detected language for transcription: ${detectedLanguage}`, "AI");
+        } else if (detectedLanguage) {
+          logger.warn(`Invalid detected language '${detectedLanguage}' - Whisper will auto-detect`, "AI");
         }
       } else if ((config as any).openai) {
         (config as any).openai.instructions = finalInstructions;
-        if (detectedLanguage) {
+        if (detectedLanguage && isValidLanguageCode(detectedLanguage)) {
           (config as any).openai.language = detectedLanguage;
           logger.info(`Detected language for transcription: ${detectedLanguage}`, "AI");
+        } else if (detectedLanguage) {
+          logger.warn(`Invalid detected language '${detectedLanguage}' - Whisper will auto-detect`, "AI");
         }
       }
 

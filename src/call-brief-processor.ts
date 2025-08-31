@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { META_PROMPT } from "./meta-prompt.js";
 import { getLogger } from "./logger.js";
 import { getVoiceCharacteristics, getVoiceDescription } from "./voice-characteristics.js";
+import { sanitizeLanguageCode } from "./language-utils.js";
 
 export interface CallBriefProcessorConfig {
   openaiApiKey: string;
@@ -135,14 +136,21 @@ Voice Context: The AI agent is using the "${voice}" voice, which is ${voiceChar.
         throw new Error(`Invalid JSON response from o3-mini: ${e}`);
       }
 
-      const { language, instructions } = parsedResponse;
+      const { language: rawLanguage, instructions } = parsedResponse;
 
       if (!instructions) {
         throw new Error("No instructions in structured response");
       }
       
-      if (!language) {
-        throw new Error("No language code in structured response");
+      // Validate and sanitize the language code
+      const language = sanitizeLanguageCode(rawLanguage) || 'en';
+      
+      if (!rawLanguage) {
+        getLogger().ai.warn('No language code in response, defaulting to English');
+      } else if (!sanitizeLanguageCode(rawLanguage)) {
+        getLogger().ai.warn(`Invalid language code '${rawLanguage}' from o3-mini, defaulting to English`);
+      } else if (language !== rawLanguage) {
+        getLogger().ai.info(`Normalized language code from '${rawLanguage}' to '${language}'`);
       }
 
       getLogger().ai.info(`Successfully generated voice agent instructions (language: ${language})`);

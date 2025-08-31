@@ -5,6 +5,7 @@ import { getLogger } from "./logger.js";
 import * as fs from "fs";
 import { Writer } from "wav";
 import { ResponseTranscriptTracker } from "./response-transcript-tracker.js";
+import { isValidLanguageCode } from "./language-utils.js";
 
 export class OpenAIClient extends EventEmitter {
   private ws: WebSocket | null = null;
@@ -910,16 +911,22 @@ export class OpenAIClient extends EventEmitter {
   private setupSession(): void {
     if (!this.isConnected || !this.ws) return;
 
+    // Build transcription config, only including language if valid
+    const transcriptionConfig: any = { model: "whisper-1" };
+    if (this.config.language && isValidLanguageCode(this.config.language)) {
+      transcriptionConfig.language = this.config.language;
+      getLogger().ai.debug(`Using language '${this.config.language}' for transcription`);
+    } else if (this.config.language) {
+      getLogger().ai.warn(`Invalid language code '${this.config.language}' - letting Whisper auto-detect`);
+    }
+
     // Send session.update with all configuration including tools
     this.send("session.update", {
       session: {
         instructions: this.config.instructions,
         voice: this.config.voice || "marin",
         turn_detection: { type: "server_vad" },
-        input_audio_transcription: { 
-          model: "whisper-1",
-          language: this.config.language // ISO-639-1 code, if provided
-        },
+        input_audio_transcription: transcriptionConfig,
         modalities: ["text", "audio"],
         input_audio_format: "pcm16",
         output_audio_format: "pcm16",

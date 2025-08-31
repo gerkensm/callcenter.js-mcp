@@ -10,6 +10,7 @@ import { loadConfig, loadConfigFromEnv } from './config.js';
 import { CallBriefProcessor, CallBriefError } from './call-brief-processor.js';
 import { Config, CallConfig, AIVoiceConfig } from './types.js';
 import { initializeLogger, LogLevel, getLogger } from './logger.js';
+import { isValidLanguageCode } from './language-utils.js';
 
 export interface CallOptions {
   /** Phone number to call */
