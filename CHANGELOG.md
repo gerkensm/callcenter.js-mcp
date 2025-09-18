@@ -40,6 +40,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Model Compatibility**: Full compatibility with latest `gpt-realtime` model (released August 28, 2025)
 - **Voice Metadata**: Voice selection now includes gender and description context for better prompt generation
 
+## [1.2.0] - 2025-09-19
+
+### Added
+- **Bundled G.722 WebAssembly Codec**: Ship a precompiled WASM build so `npx` users get wideband audio without native toolchains
+- **WASM Build & Postinstall Scripts**: New `npm run build:wasm`, `build:all`, and postinstall safeguards that cache emcc output and skip rebuilds when artifacts already exist
+- **Native/WASM Loader Fallback**: Unified loader automatically prefers the native addon when present and transparently falls back to the bundled WASM module
+
+### Changed
+- **Default Build Flow**: `npm run build` now refreshes WASM + TypeScript only, leaving native compilation as an opt-in step
+- **Distribution Layout**: `dist/` is tracked so prebuilt codecs ship with the package and GitHub `npx` installs work offline
+- **Documentation Updates**: README and quick-start instructions highlight the compiler-free WASM codec and new build scripts
+
 ## [1.1.0] - 2025-08-28
 
 ### Added
@@ -94,4 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **G.722 Reference Implementation**: Carnegie Mellon/Steve Underwood/Sippy Software
 - **Node.js Native Addons**: N-API for native code integration
 
-[1.0.0]: https://github.com/username/ai-voice-agent/releases/tag/v1.0.0
+[Unreleased]: https://github.com/gerkensm/callcenter.js-mcp/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/gerkensm/callcenter.js-mcp/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/gerkensm/callcenter.js-mcp/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/gerkensm/callcenter.js-mcp/releases/tag/v1.0.0

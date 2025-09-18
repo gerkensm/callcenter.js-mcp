@@ -1,0 +1,42 @@
+import { SIPAdvancedConfig, CallConfig, CallEvent } from "./types.js";
+export declare class SIPClient {
+    private userAgent;
+    private config;
+    private currentSession;
+    private eventCallback;
+    private mediaHandler;
+    private presetRtpPort;
+    private keepAliveTimer;
+    private connectionState;
+    private isLocalHangup;
+    constructor(config: SIPAdvancedConfig, eventCallback: (event: CallEvent) => void);
+    private validateProviderRequirements;
+    connect(): Promise<void>;
+    private buildSipjsConfiguration;
+    private buildNATConfiguration;
+    private buildSessionConfiguration;
+    private buildTransportConfiguration;
+    private buildAuthConfiguration;
+    private applyProviderQuirks;
+    private setupEventHandlers;
+    private handleRegistrationError;
+    private handleProviderSpecificError;
+    private handleAsteriskError;
+    private handleCiscoError;
+    private handleFritzBoxError;
+    private handleTransportFallback;
+    private patchSipLibraryLogging;
+    private startKeepalive;
+    private sendKeepalive;
+    private stopKeepalive;
+    makeCall(callConfig: CallConfig): Promise<string>;
+    private handleCallEnd;
+    endCall(): Promise<void>;
+    isConnected(): boolean;
+    getCurrentCallId(): string | null;
+    getCurrentSession(): any;
+    setLocalRtpPort(port: number): void;
+    setRemoteRtpInfo(ip: string, port: number): void;
+    disconnect(): Promise<void>;
+}
+//# sourceMappingURL=sip-client.d.ts.map

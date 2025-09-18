@@ -135,6 +135,7 @@ Your MCP Client will automatically handle the entire conversation using the AI V
 ## ✨ Key Features
 
 - 🎙️ **Multiple Codec Support**: G.722 wideband (16kHz) + G.711 fallback for broad compatibility
+- 🧩 **Compiler-Free WASM Codec**: Ships with a prebuilt G.722 WebAssembly module so `npx` users get wideband audio without installing build tools (native addon still available for max performance)
 - 🤖 **AI-Powered Conversations**: Uses OpenAI's Real-Time Voice API with the latest `gpt-realtime` model (released August 28, 2025) for actual calls, with o3-mini model for instruction generation
 - 🌍 **Automatic Language Detection**: Intelligently detects conversation language from call briefs and configures transcription accordingly
 - 🎭 **Auto Voice Selection**: New 'auto' mode where o3-mini selects optimal voice based on call context (formality, industry, goals)
@@ -184,20 +185,20 @@ EOF
 npx github:gerkensm/callcenter.js-mcp call "+1234567890" --brief "Call restaurant"
 ```
 
-**Note**: First run may show build warnings if you don't have C++ build tools, but will work fine with G.711 codec fallback (standard phone quality). For **much better audio quality**, install build tools first to enable G.722 wideband codec.
+**Note**: High-quality G.722 audio ships as a prebuilt WebAssembly module, so `npx` works even on machines without compilers. If you want the faster native addon instead, run `npm run build:native` (or `npm run build:all`) after cloning.
 
 ### Option 2: Local Installation
 
 #### Prerequisites
 
 - Node.js 20+
-- **Python 3.x + Build tools** (for G.722 wideband audio - **much better call quality**)
+- (Optional) **Python 3.x + C/C++ build tools** — only needed if you plan to rebuild the native addon instead of using the bundled WebAssembly codec
   - macOS: Xcode Command Line Tools (`xcode-select --install`)
   - Windows: Visual Studio Build Tools 
   - Linux: `build-essential` package
 - OpenAI API key
 
-**Note**: Without build tools, the system automatically falls back to G.711 (standard phone quality). G.722 provides 2x bandwidth for clearer, more natural conversations.
+**Note**: The prebuilt WebAssembly codec already provides wideband G.722 audio out of the box. Rebuilding the native addon is optional and mainly useful for squeezing out a little more performance.
 
 #### Installation
 
@@ -686,9 +687,10 @@ The project includes ready-to-use configurations for all major providers:
 
 ### G.722 Implementation
 
-- **Native C++ addon** for optimal performance
+- **Prebuilt WebAssembly codec** bundled with the package so every install gets wideband audio out of the box
+- **Native C++ addon** still available for optimal performance when you opt-in with `npm run build:native`
 - **Based on reference implementations** from CMU and Sippy Software
-- **Automatic fallback** to G.711 if compilation fails
+- **Automatic fallback** to G.711 if codec loading fails for any reason
 - **Real-time encoding/decoding** with low latency
 
 ### Optional Call Recording
@@ -704,7 +706,10 @@ The project includes ready-to-use configurations for all major providers:
 # Test codec availability
 npm run test:codecs
 
-# Build without G.722 if needed
+# Rebuild all codec artifacts (native + WASM + TS) if you changed the C sources
+npm run build:all
+
+# Disable G.722 entirely if you only want the G.711 fallback
 npm run build:no-g722
 ```
 
@@ -970,11 +975,13 @@ mcp__callcenter_js__advanced_call({
 ### Build Commands
 
 ```bash
-# Full build (TypeScript + native addon)
+# Default build (WASM refresh + TypeScript, skips if artifacts already exist)
 npm run build
 
-# Build components separately  
-npm run build:native    # Native G.722 addon only
+# Build components separately (useful for maintainers)  
+npm run build:wasm     # Regenerate the G.722 WebAssembly codec
+npm run build:native   # Rebuild the native addon (requires toolchain)
+npm run build:all      # Run native + WASM + TypeScript in one go
 npm run build:ts       # TypeScript compilation only
 
 # Development with hot reload
@@ -1103,10 +1110,9 @@ The built-in validation system provides comprehensive analysis:
 
 ### Build Problems
 
-1. **Native compilation fails**:
+1. **Native compilation fails** (only happens if you explicitly ran `npm run build:native` or `npm run build:all`): stick with the bundled WASM codec unless you specifically need native performance. To drop back to G.711 entirely, run:
    ```bash
-   # Install build tools first, then:
-   npm run build:no-g722  # Fallback to G.711 only
+   npm run build:no-g722
    ```
 
 2. **Provider-specific issues**: Check validation recommendations for your provider

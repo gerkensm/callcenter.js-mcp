@@ -1,6 +1,6 @@
 {
   "name": "ai-voice-agent",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "AI-powered VoIP agent with G.722 wideband audio support for SIP-based voice communications",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -41,10 +41,12 @@
   },
   "scripts": {
     "build:native": "node-gyp rebuild",
+    "build:wasm": "node scripts/build-wasm.js",
     "build:ts": "tsc && cp src/codecs/g722-loader.cjs dist/codecs/",
-    "build": "npm run build:native; npm run build:ts",
-    "build:safe": "(npm run build:native || true) && (npm run build:ts || echo 'TypeScript compilation failed during install. Run npm run build:ts manually.')",
-    "build:no-g722": "ENABLE_G722=0 npm run build:native && npm run build:ts",
+    "build": "npm run build:wasm && npm run build:ts",
+    "build:all": "npm run build:native && npm run build:wasm && npm run build:ts",
+    "build:safe": "(npm run build:native || true) && (npm run build:wasm || true) && (npm run build:ts || echo 'TypeScript compilation failed during install. Run npm run build:ts manually.')",
+    "build:no-g722": "ENABLE_G722=0 npm run build:native && (npm run build:wasm || true) && npm run build:ts",
     "start": "npm run build && node dist/cli.js",
     "dev": "node --loader ts-node/esm src/cli.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -58,7 +60,7 @@
     "validate:3cx": "npm run validate config.3cx.example.json --detailed",
     "validate:generic": "npm run validate config.generic.example.json --detailed",
     "clean": "rm -rf dist build node_modules/.cache",
-    "postinstall": "npm run build:safe || true"
+    "postinstall": "node scripts/postinstall.js"
   },
   "gypfile": true,
   "keywords": [
