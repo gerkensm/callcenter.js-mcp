@@ -95,6 +95,6 @@
   },
   "devDependencies": {
     "@types/wav": "^1.0.4",
-    "node-gyp": "^10.1.0"
+    "node-gyp": "^11.4.2"
   }
 }
