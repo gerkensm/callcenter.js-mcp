@@ -80,7 +80,7 @@
   "dependencies": {
     "@types/node": "^24.6.2",
     "@types/ws": "^8.18.1",
-    "commander": "^14.0.0",
+    "commander": "^14.0.1",
     "dotenv": "^17.2.3",
     "g711": "^1.0.1",
     "node-addon-api": "^8.0.0",
