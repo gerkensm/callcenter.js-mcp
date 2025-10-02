@@ -88,7 +88,7 @@
     "rtp-parser": "^1.0.0",
     "sipjs-udp": "^0.0.18",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.2",
+    "typescript": "^5.9.3",
     "wav": "^1.0.2",
     "winston": "^3.17.0",
     "ws": "^8.18.3"
