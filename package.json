@@ -78,7 +78,7 @@
   "author": "Torben",
   "license": "MIT",
   "dependencies": {
-    "@types/node": "^24.3.0",
+    "@types/node": "^24.6.2",
     "@types/ws": "^8.18.1",
     "commander": "^14.0.0",
     "dotenv": "^17.2.3",
