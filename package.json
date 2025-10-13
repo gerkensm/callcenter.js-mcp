@@ -84,7 +84,7 @@
     "dotenv": "^17.2.3",
     "g711": "^1.0.1",
     "node-addon-api": "^8.0.0",
-    "openai": "^6.0.1",
+    "openai": "^6.3.0",
     "rtp-parser": "^1.0.0",
     "sipjs-udp": "^0.0.18",
     "ts-node": "^10.9.2",
