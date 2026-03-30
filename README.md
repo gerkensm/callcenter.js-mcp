@@ -1201,3 +1201,8 @@ MIT License - see [LICENSE](LICENSE) for details.
 ---
 
 **Ready to get started?** Copy an example config, run `npm run validate:detailed`, and start making AI-powered voice calls! 🚀
+
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/gerkensm-callcenter-js-mcp).
+
